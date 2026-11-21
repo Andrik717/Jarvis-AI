@@ -51,7 +51,7 @@ class SpeechOutput:
         import edge_tts
         import pygame
 
-        voice = getattr(self.settings, "tts_voice", "ru-RU-SvetlanaNeural")
+        voice = getattr(self.settings, "tts_voice", "ru-RU-DmitryNeural")
 
         async def synthesize(path):
             communicate = edge_tts.Communicate(

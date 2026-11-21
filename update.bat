@@ -9,9 +9,9 @@ if not exist "jarvis\brain.py" (
     exit /b 1
 )
 
-echo Обновляю мозг, память, интерфейс и мужской голос Джарвиса...
+echo Обновляю мозг, память, интерфейс, голос и управление Windows...
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
- "$ErrorActionPreference='Stop'; $files=@(@{Path='jarvis/brain.py';Target='jarvis\brain.py'},@{Path='jarvis/app.py';Target='jarvis\app.py'},@{Path='jarvis/tts.py';Target='jarvis\tts.py'},@{Path='jarvis/config.py';Target='jarvis\config.py'}); foreach($file in $files) { $temp=$file.Target+'.new'; Invoke-WebRequest -UseBasicParsing -Uri ('https://raw.githubusercontent.com/Andrik717/Jarvis-AI/main/'+$file.Path) -OutFile $temp; if(Test-Path $file.Target){Copy-Item $file.Target ($file.Target+'.bak') -Force}; Move-Item $temp $file.Target -Force }; Write-Host 'Готово! Мозг, память, интерфейс и голос обновлены.' -ForegroundColor Green"
+ "$ErrorActionPreference='Stop'; $files=@(@{Path='jarvis/brain.py';Target='jarvis\brain.py'},@{Path='jarvis/app.py';Target='jarvis\app.py'},@{Path='jarvis/tts.py';Target='jarvis\tts.py'},@{Path='jarvis/config.py';Target='jarvis\config.py'},@{Path='jarvis/pc_control.py';Target='jarvis\pc_control.py'}); foreach($file in $files) { $temp=$file.Target+'.new'; Invoke-WebRequest -UseBasicParsing -Uri ('https://raw.githubusercontent.com/Andrik717/Jarvis-AI/main/'+$file.Path) -OutFile $temp; if(Test-Path $file.Target){Copy-Item $file.Target ($file.Target+'.bak') -Force}; Move-Item $temp $file.Target -Force }; Write-Host 'Готово! Мозг, память, интерфейс, голос и управление Windows обновлены.' -ForegroundColor Green"
 if errorlevel 1 (
     echo Не удалось скачать обновление. Проверьте подключение к интернету.
     pause

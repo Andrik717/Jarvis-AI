@@ -10,7 +10,7 @@ SETTINGS_FILE = APP_DIR / "settings.json"
 @dataclass
 class Settings:
     language: str = "ru"
-    whisper_model: str = "small"
+    whisper_model: str = "base"
     compute_type: str = "int8"
     beam_size: int = 1
     vad_filter: bool = True
@@ -31,7 +31,7 @@ def load_settings() -> Settings:
             data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             data = {}
-    # Миграция старых настроек: не оставляем прежний роботизированный SAPI по умолчанию.
+    # Более компактная Whisper Base заметно быстрее на обычном CPU, чем Small.\n    if data.get("whisper_model") == "small":\n        data["whisper_model"] = "base"\n    # Миграция старых настроек: не оставляем прежний роботизированный SAPI по умолчанию.
     if data.get("tts_backend") == "sapi":
         data["tts_backend"] = "edge"
     # Переключаем прежний женский голос по умолчанию на мужской голос Джарвиса.

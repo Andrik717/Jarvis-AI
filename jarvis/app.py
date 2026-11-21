@@ -175,7 +175,7 @@ class JarvisWindow:
                 self._ui(messagebox.showerror, "Синтез речи", str(exc))
                 self._ui(self.status.set, "НЕ УДАЛОСЬ ЗАПУСТИТЬ ГОЛОС")
             finally:
-                self._ui(self._set_busy, False, self.status.get())
+                self._ui(self._finish_busy)
 
         threading.Thread(target=worker, daemon=True).start()
 

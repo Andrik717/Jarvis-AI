@@ -1,9 +1,10 @@
 """Основное окно Jarvis AI: голосовой диалог, локальный ИИ и настройки."""
 from __future__ import annotations
 
+import ctypes
 import threading
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import filedialog, messagebox
 
 from .config import load_settings, save_settings
 from .audio import Microphone
@@ -111,6 +112,11 @@ class JarvisWindow:
             activebackground="#25495a", activeforeground=TEXT,
             relief="flat", bd=0, cursor="hand2", padx=12, pady=11).pack(side="left", padx=(8, 0))
         tk.Button(
+            controls, text="СОХРАНИТЬ ЧАТ TXT", command=self._save_dialog,
+            font=("Segoe UI", 9, "bold"), bg="#18313f", fg=TEXT,
+            activebackground="#25495a", activeforeground=TEXT,
+            relief="flat", bd=0, cursor="hand2", padx=12, pady=11).pack(side="left", padx=(8, 0))
+        tk.Button(
             controls, text="ОЧИСТИТЬ ПАМЯТЬ", command=self.clear_memory,
             font=("Segoe UI", 9, "bold"), bg="#4a2930", fg=TEXT,
             activebackground="#66343d", activeforeground=TEXT,
@@ -132,17 +138,56 @@ class JarvisWindow:
 
     def _put_clipboard(self, text: str):
         if not text:
-            self.status.set("СНАЧАЛА ВЫДЕЛИТЕ ТЕКСТ ИЛИ ДОЖДИТЕСЬ ОТВЕТА")
+            self.status.set("НЕТ ТЕКСТА ДЛЯ КОПИРОВАНИЯ")
             return False
+
+        # Сначала используем системный буфер Windows напрямую.
         try:
-            self.root.clipboard_clear()
-            self.root.clipboard_append(text)
-            self.root.update()
-            self.status.set("ТЕКСТ СКОПИРОВАН — МОЖНО ВСТАВИТЬ CTRL+V")
-            return True
-        except tk.TclError as exc:
-            self.status.set("ОШИБКА БУФЕРА ОБМЕНА: " + str(exc)[:70])
-            return False
+            if __import__("os").name == "nt":
+                user32 = ctypes.windll.user32
+                kernel32 = ctypes.windll.kernel32
+                data = (text + "\\0").encode("utf-16-le")
+                GMEM_MOVEABLE = 0x0002
+                CF_UNICODETEXT = 13
+                kernel32.GlobalAlloc.restype = ctypes.c_void_p
+                kernel32.GlobalLock.restype = ctypes.c_void_p
+                kernel32.GlobalUnlock.argtypes = [ctypes.c_void_p]
+                kernel32.GlobalFree.argtypes = [ctypes.c_void_p]
+                user32.SetClipboardData.restype = ctypes.c_void_p
+                if not user32.OpenClipboard(None):
+                    raise OSError("Windows не открыл буфер обмена")
+                handle = None
+                try:
+                    if not user32.EmptyClipboard():
+                        raise OSError("Не удалось очистить буфер обмена")
+                    handle = kernel32.GlobalAlloc(GMEM_MOVEABLE, len(data))
+                    if not handle:
+                        raise OSError("Не удалось выделить память")
+                    pointer = kernel32.GlobalLock(handle)
+                    if not pointer:
+                        raise OSError("Не удалось получить доступ к памяти")
+                    ctypes.memmove(pointer, data, len(data))
+                    kernel32.GlobalUnlock(handle)
+                    if not user32.SetClipboardData(CF_UNICODETEXT, handle):
+                        raise OSError("Windows не принял текст")
+                    handle = None  # память теперь принадлежит буферу Windows
+                finally:
+                    user32.CloseClipboard()
+                    if handle:
+                        kernel32.GlobalFree(handle)
+            else:
+                raise OSError("Используем встроенный буфер Tk")
+        except Exception:
+            try:
+                self.root.clipboard_clear()
+                self.root.clipboard_append(text)
+                self.root.update()
+            except tk.TclError as exc:
+                self.status.set("НЕ УДАЛОСЬ СКОПИРОВАТЬ: " + str(exc)[:65])
+                return False
+
+        self.status.set("СКОПИРОВАНО! ТЕПЕРЬ ВСТАВЬТЕ CTRL+V")
+        return True
 
     def _copy_selection(self, event=None):
         try:
@@ -162,7 +207,34 @@ class JarvisWindow:
         return "break"
 
     def _copy_last_answer(self):
-        self._put_clipboard(self.last_answer)
+        answer = self.last_answer.strip()
+        if not answer:
+            for line in reversed(self.log.get("1.0", "end-1c").splitlines()):
+                if line.startswith("ДЖАРВИС: "):
+                    answer = line[len("ДЖАРВИС: "):].strip()
+                    break
+        self._put_clipboard(answer)
+
+    def _save_dialog(self):
+        content = self.log.get("1.0", "end-1c")
+        if not content.strip():
+            self.status.set("ИСТОРИЯ ДИАЛОГА ПУСТА")
+            return
+        path = filedialog.asksaveasfilename(
+            parent=self.root,
+            title="Сохранить переписку Джарвиса",
+            defaultextension=".txt",
+            filetypes=[("Текстовый файл", "*.txt")],
+            initialfile="dialog_jarvis.txt",
+        )
+        if not path:
+            return
+        try:
+            with open(path, "w", encoding="utf-8-sig") as file:
+                file.write(content)
+            self.status.set("ПЕРЕПИСКА СОХРАНЕНА В TXT")
+        except OSError as exc:
+            messagebox.showerror("Ошибка сохранения", str(exc), parent=self.root)
 
     def _set_last_answer(self, answer: str):
         self.last_answer = answer

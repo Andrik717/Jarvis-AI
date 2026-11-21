@@ -82,7 +82,7 @@ class SpeechOutput:
         import edge_tts
         import pygame
 
-        voice = self.settings.tts_voice or "ru-RU-DmitryNeural"
+        voice = "ru-RU-DmitryNeural"  # Закреплённый мужской голос Джарвиса
         chunks = _speech_chunks(text)
         audio_queue: queue.Queue = queue.Queue()
         temporary_files: list[str] = []

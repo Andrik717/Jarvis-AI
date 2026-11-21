@@ -71,8 +71,14 @@ class JarvisWindow:
                            selectbackground="#24515d", relief="flat", wrap="word",
                            font=("Segoe UI", 11), padx=14, pady=8, height=9, borderwidth=0)
         self.log.pack(fill="both", expand=True, padx=4, pady=(0, 8))
-        self._append("ДЖАРВИС: Система запущена. Я готов к разговору.")
-        self._append("ПОДСКАЗКА: для работы ИИ установи Ollama и модель qwen2.5:3b.")
+        if self.brain.history:
+            self._append("СИСТЕМА: Предыдущая история диалога восстановлена.")
+            for item in self.brain.history[-10:]:
+                label = "ВЫ" if item["role"] == "user" else "ДЖАРВИС"
+                self._append(f"{label}: {item['content']}")
+        else:
+            self._append("ДЖАРВИС: Система запущена. Я готов к разговору.")
+        self._append("ПОДСКАЗКА: скажите «Запомни, что…», чтобы сохранить важный факт.")
 
         controls = tk.Frame(self.root, bg=BG)
         controls.pack(fill="x", padx=28, pady=(8, 18))
@@ -82,6 +88,11 @@ class JarvisWindow:
             activebackground="#25495a", activeforeground=TEXT,
             relief="flat", bd=0, cursor="hand2", padx=14, pady=11)
         self.voice_button.pack(side="left")
+        tk.Button(
+            controls, text="ОЧИСТИТЬ ПАМЯТЬ", command=self.clear_memory,
+            font=("Segoe UI", 9, "bold"), bg="#4a2930", fg=TEXT,
+            activebackground="#66343d", activeforeground=TEXT,
+            relief="flat", bd=0, cursor="hand2", padx=14, pady=11).pack(side="left", padx=(8, 0))
         tk.Button(
             controls, text="НАСТРОЙКИ ИИ", command=self.open_settings,
             font=("Segoe UI", 9, "bold"), bg="#18313f", fg=TEXT,
@@ -140,6 +151,19 @@ class JarvisWindow:
             self._ui(self.status.set, "НЕ УДАЛОСЬ ОБРАБОТАТЬ ЗАПРОС — СМОТРИТЕ ЖУРНАЛ")
         finally:
             self._ui(self._finish_busy)
+
+    def clear_memory(self):
+        if self._busy:
+            return
+        confirmed = messagebox.askyesno(
+            "Очистка памяти",
+            "Удалить сохранённые факты и историю разговоров? Это действие нельзя отменить.",
+            parent=self.root,
+        )
+        if confirmed:
+            self.brain.reset()
+            self.log.delete("1.0", "end")
+            self._append("СИСТЕМА: Память и история очищены. Начинаем с чистого листа.")
 
     def test_voice(self):
         if self._busy:

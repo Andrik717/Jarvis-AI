@@ -14,11 +14,12 @@ class Settings:
     compute_type: str = "int8"
     beam_size: int = 1
     vad_filter: bool = True
-    tts_backend: str = "sapi"
+    tts_backend: str = "edge"
+    tts_voice: str = "ru-RU-SvetlanaNeural"
     sapi_rate: int = 0
     sapi_volume: int = 100
-    llm_base_url: str = ""
-    llm_model: str = ""
+    llm_base_url: str = "http://localhost:11434"
+    llm_model: str = "qwen2.5:3b"
     # API key intentionally loaded only from environment, never serialized.
 
 

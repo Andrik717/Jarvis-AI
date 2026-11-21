@@ -74,10 +74,9 @@ class JarvisWindow:
                            selectbackground="#24515d", relief="flat", wrap="word",
                            font=("Segoe UI", 11), padx=14, pady=8, height=9, borderwidth=0)
         self.log.pack(fill="both", expand=True, padx=4, pady=(0, 8))
-        # Обрабатываем физическую клавишу C, а не только символ раскладки.
-        # В русской раскладке Tk может передавать Cyrillic_es вместо латинской c.
-        self.root.bind_all("<Control-KeyPress>", self._copy_on_ctrl_key, add="+")
-        self.log.bind("<Control-KeyPress>", self._copy_on_ctrl_key, add="+")
+        # Слушаем все нажатия: на Windows Tk по-разному описывает Ctrl+C
+        # в зависимости от активной раскладки клавиатуры.
+        self.root.bind_all("<KeyPress>", self._copy_on_ctrl_key, add="+")
         self.root.bind_all("<Control-Insert>", self._copy_selection, add="+")
         self.log.bind("<Control-Insert>", self._copy_selection, add="+")
         self.context_menu = tk.Menu(self.root, tearoff=0)
@@ -213,11 +212,29 @@ class JarvisWindow:
     def _copy_on_ctrl_key(self, event=None):
         if event is None:
             return None
+
         keysym = str(getattr(event, "keysym", "")).lower()
+        char = str(getattr(event, "char", "")).lower()
         keycode = getattr(event, "keycode", 0)
-        # VK_C = 67 на Windows; Cyrillic_es — «с» в русской раскладке.
-        is_c = keysym in ("c", "с", "cyrillic_es") or keycode == 67
-        if is_c and (getattr(event, "state", 0) & 0x4):
+        state = getattr(event, "state", 0)
+
+        # На Windows проверяем состояние Ctrl напрямую: Tk может менять
+        # state/keysym при переключении русской и английской раскладки.
+        ctrl_down = bool(state & 0x4)
+        if not ctrl_down:
+            try:
+                ctrl_down = bool(ctypes.windll.user32.GetKeyState(0x11) & 0x8000)
+            except Exception:
+                pass
+
+        # В русской раскладке физическая клавиша C может приходить как
+        # Cyrillic_es, «с» или иной keysym; учитываем также символ и VK-код.
+        is_c = (
+            keysym in ("c", "с", "cyrillic_es")
+            or char in ("c", "с")
+            or keycode == 67
+        )
+        if ctrl_down and is_c:
             return self._copy_selection(event)
         return None
 

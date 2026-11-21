@@ -137,56 +137,73 @@ class JarvisWindow:
         self.log.see("end")
 
     def _put_clipboard(self, text: str):
-        if not text:
+        if not text or not text.strip():
             self.status.set("НЕТ ТЕКСТА ДЛЯ КОПИРОВАНИЯ")
             return False
 
-        # Сначала используем системный буфер Windows напрямую.
+        # Сначала используем штатный буфер Tkinter: он корректно работает с Unicode.
         try:
-            if __import__("os").name == "nt":
-                user32 = ctypes.windll.user32
-                kernel32 = ctypes.windll.kernel32
-                data = (text + "\\0").encode("utf-16-le")
-                GMEM_MOVEABLE = 0x0002
-                CF_UNICODETEXT = 13
-                kernel32.GlobalAlloc.restype = ctypes.c_void_p
-                kernel32.GlobalLock.restype = ctypes.c_void_p
-                kernel32.GlobalUnlock.argtypes = [ctypes.c_void_p]
-                kernel32.GlobalFree.argtypes = [ctypes.c_void_p]
-                user32.SetClipboardData.restype = ctypes.c_void_p
-                if not user32.OpenClipboard(None):
-                    raise OSError("Windows не открыл буфер обмена")
-                handle = None
-                try:
-                    if not user32.EmptyClipboard():
-                        raise OSError("Не удалось очистить буфер обмена")
-                    handle = kernel32.GlobalAlloc(GMEM_MOVEABLE, len(data))
-                    if not handle:
-                        raise OSError("Не удалось выделить память")
-                    pointer = kernel32.GlobalLock(handle)
-                    if not pointer:
-                        raise OSError("Не удалось получить доступ к памяти")
-                    ctypes.memmove(pointer, data, len(data))
-                    kernel32.GlobalUnlock(handle)
-                    if not user32.SetClipboardData(CF_UNICODETEXT, handle):
-                        raise OSError("Windows не принял текст")
-                    handle = None  # память теперь принадлежит буферу Windows
-                finally:
-                    user32.CloseClipboard()
-                    if handle:
-                        kernel32.GlobalFree(handle)
-            else:
-                raise OSError("Используем встроенный буфер Tk")
-        except Exception:
+            self.root.clipboard_clear()
+            self.root.clipboard_append(text)
+            self.root.update_idletasks()
+            self.root.update()
+            copied = self.root.clipboard_get()
+            if copied != text:
+                raise tk.TclError("Проверка буфера обмена не пройдена")
+        except tk.TclError as first_error:
+            # Резервный прямой способ для Windows.
+            if __import__("os").name != "nt":
+                self.status.set("ОШИБКА КОПИРОВАНИЯ: " + str(first_error)[:60])
+                return False
             try:
-                self.root.clipboard_clear()
-                self.root.clipboard_append(text)
-                self.root.update()
-            except tk.TclError as exc:
-                self.status.set("НЕ УДАЛОСЬ СКОПИРОВАТЬ: " + str(exc)[:65])
+                user32 = ctypes.WinDLL("user32", use_last_error=True)
+                kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+                handle_type = ctypes.c_void_p
+                user32.OpenClipboard.argtypes = [handle_type]
+                user32.OpenClipboard.restype = ctypes.c_bool
+                user32.EmptyClipboard.restype = ctypes.c_bool
+                user32.SetClipboardData.argtypes = [ctypes.c_uint, handle_type]
+                user32.SetClipboardData.restype = handle_type
+                user32.CloseClipboard.restype = ctypes.c_bool
+                kernel32.GlobalAlloc.argtypes = [ctypes.c_uint, ctypes.c_size_t]
+                kernel32.GlobalAlloc.restype = handle_type
+                kernel32.GlobalLock.argtypes = [handle_type]
+                kernel32.GlobalLock.restype = handle_type
+                kernel32.GlobalUnlock.argtypes = [handle_type]
+                kernel32.GlobalUnlock.restype = ctypes.c_bool
+                kernel32.GlobalFree.argtypes = [handle_type]
+                kernel32.GlobalFree.restype = handle_type
+
+                memory = None
+                opened = False
+                try:
+                    if not user32.OpenClipboard(None):
+                        raise OSError("Буфер обмена занят")
+                    opened = True
+                    if not user32.EmptyClipboard():
+                        raise OSError("Не удалось очистить буфер")
+                    data = (text + "\\0").encode("utf-16-le")
+                    memory = kernel32.GlobalAlloc(0x0002, len(data))
+                    if not memory:
+                        raise OSError("Не удалось выделить память")
+                    pointer = kernel32.GlobalLock(memory)
+                    if not pointer:
+                        raise OSError("Не удалось получить память")
+                    ctypes.memmove(pointer, data, len(data))
+                    kernel32.GlobalUnlock(memory)
+                    if not user32.SetClipboardData(13, memory):
+                        raise OSError("Windows не принял текст")
+                    memory = None
+                finally:
+                    if opened:
+                        user32.CloseClipboard()
+                    if memory:
+                        kernel32.GlobalFree(memory)
+            except Exception as exc:
+                self.status.set("НЕ УДАЛОСЬ СКОПИРОВАТЬ: " + str(exc)[:55])
                 return False
 
-        self.status.set("СКОПИРОВАНО! ТЕПЕРЬ ВСТАВЬТЕ CTRL+V")
+        self.status.set("СКОПИРОВАНО! ВСТАВЬТЕ ТЕКСТ КЛАВИШАМИ CTRL+V")
         return True
 
     def _copy_selection(self, event=None):

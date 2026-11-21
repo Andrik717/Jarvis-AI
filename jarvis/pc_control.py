@@ -42,15 +42,27 @@ def _weather_for_city(city: str) -> str:
     if not city:
         return "Назови город, и я проверю погоду."
     try:
-        geo_url = (
-            "https://geocoding-api.open-meteo.com/v1/search?"
-            + urllib.parse.urlencode({"name": city, "count": 1, "language": "ru", "format": "json"})
-        )
-        request = urllib.request.Request(geo_url, headers={"User-Agent": "JarvisAI/1.0"})
-        with urllib.request.urlopen(request, timeout=8) as response:
-            places = json.loads(response.read().decode("utf-8")).get("results") or []
+        # В разговоре город обычно называют в предложном падеже:
+        # «в Екатеринбурге», «в Москве». Геокодеру передаём также начальную форму.
+        candidates = [city]
+        for ending in ("е", "и", "у", "ю", "ом", "ем"):
+            if city.casefold().endswith(ending) and len(city) > len(ending) + 2:
+                candidates.append(city[:-len(ending)])
+                break
+
+        places = []
+        for candidate in dict.fromkeys(candidates):
+            geo_url = (
+                "https://geocoding-api.open-meteo.com/v1/search?"
+                + urllib.parse.urlencode({"name": candidate, "count": 1, "language": "ru", "format": "json"})
+            )
+            request = urllib.request.Request(geo_url, headers={"User-Agent": "JarvisAI/1.0"})
+            with urllib.request.urlopen(request, timeout=8) as response:
+                places = json.loads(response.read().decode("utf-8")).get("results") or []
+            if places:
+                break
         if not places:
-            return f"Не нашёл город «{city}». Проверь название и попробуй ещё раз."
+            return f"Не нашёл город «{city}». Назови город ещё раз, пожалуйста."
 
         place = places[0]
         params = {
@@ -105,13 +117,16 @@ def handle_command(user_text: str) -> str | None:
     if not text:
         return None
 
-    # Погода: отвечаем только по данным реального погодного сервиса, не по догадкам модели.
-    weather_match = re.match(
-        r"^(?:какая погода|погода|что с погодой|температура)\s+(?:сейчас\s+)?(?:в|для)\s+(.+)$",
-        text,
-    )
-    if weather_match:
-        return _weather_for_city(weather_match.group(1).strip())
+    # Любой вопрос о погоде перехватываем до локальной модели.
+    # Это не позволяет модели выдавать выдуманные шаблоны вместо прогноза.
+    if re.search(r"\b(?:погод\w*|температур\w*)\b", text):
+        city_match = re.search(r"\b(?:в|для)\s+(.+)$", text)
+        if not city_match:
+            return "Конечно. В каком городе проверить погоду?"
+        city = city_match.group(1).strip()
+        if city in ("сейчас", "сегодня", "завтра"):
+            return "Назови город, для которого проверить погоду."
+        return _weather_for_city(city)
 
     # Поиск в интернете: открываем запрос в браузере, ничего не исполняем.
     search_match = re.match(

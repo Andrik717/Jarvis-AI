@@ -77,8 +77,12 @@ class JarvisWindow:
         self.log.bind("<Control-C>", self._copy_selection)
         self.log.bind("<Control-Insert>", self._copy_selection)
         self.context_menu = tk.Menu(self.root, tearoff=0)
-        self.context_menu.add_command(label="Копировать", command=self._copy_selection)
+        self.context_menu.add_command(label="Копировать выделенное", command=self._copy_selection)
+        self.context_menu.add_command(label="Копировать весь диалог", command=self._copy_all_dialog)
+        self.context_menu.add_command(label="Копировать последний ответ Джарвиса", command=self._copy_last_answer)
         self.log.bind("<Button-3>", self._show_context_menu)
+        self.log.bind("<Control-a>", self._select_all)
+        self.log.bind("<Control-A>", self._select_all)
         if self.brain.history:
             self._append("СИСТЕМА: Предыдущая история диалога восстановлена.")
             for item in self.brain.history[-10:]:
@@ -102,7 +106,7 @@ class JarvisWindow:
             activebackground="#25495a", activeforeground=TEXT,
             relief="flat", bd=0, cursor="hand2", padx=12, pady=11).pack(side="left", padx=(8, 0))
         tk.Button(
-            controls, text="КОПИРОВАТЬ ВЫДЕЛЕННОЕ", command=self._copy_selection,
+            controls, text="КОПИРОВАТЬ ВЕСЬ ЧАТ", command=self._copy_all_dialog,
             font=("Segoe UI", 9, "bold"), bg="#18313f", fg=TEXT,
             activebackground="#25495a", activeforeground=TEXT,
             relief="flat", bd=0, cursor="hand2", padx=12, pady=11).pack(side="left", padx=(8, 0))
@@ -146,6 +150,15 @@ class JarvisWindow:
         except tk.TclError:
             selected = ""
         self._put_clipboard(selected)
+        return "break"
+
+    def _copy_all_dialog(self):
+        self._put_clipboard(self.log.get("1.0", "end-1c"))
+
+    def _select_all(self, event=None):
+        self.log.tag_add("sel", "1.0", "end-1c")
+        self.log.mark_set("insert", "end-1c")
+        self.log.see("insert")
         return "break"
 
     def _copy_last_answer(self):

@@ -94,7 +94,6 @@ class JarvisBrain:
         )):
             self.reset()
             answer = "Хорошо. Я очистил сохранённую память и историю наших разговоров."
-            self._remember_exchange(normalized, answer)
             return answer
 
         match = re.match(r"^запомни\s*,?\s*(?:что\s+)?(.+)$", normalized, re.IGNORECASE)

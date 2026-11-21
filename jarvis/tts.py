@@ -1,4 +1,4 @@
-"""Быстрая потоковая пофразовая озвучка Edge TTS с голосом Дмитрия."""
+"""Быстрая пофразовая озвучка Edge TTS с резервной генерацией целого ответа."""
 from __future__ import annotations
 
 import asyncio
@@ -15,7 +15,6 @@ from .config import Settings
 
 
 def _speech_text(value: str) -> str:
-    """Убирает разметку, которую не нужно читать вслух."""
     text = str(value or "")
     text = re.sub(r"```.*?```", " Фрагмент кода опущен. ", text, flags=re.S)
     text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
@@ -28,7 +27,6 @@ def _speech_text(value: str) -> str:
 
 
 def _speech_chunks(text: str, limit: int = 180) -> list[str]:
-    """Делит ответ на короткие естественные фразы для раннего старта речи."""
     sentences = re.split(r"(?<=[.!?…])\s+", text)
     chunks: list[str] = []
     current = ""
@@ -46,14 +44,13 @@ def _speech_chunks(text: str, limit: int = 180) -> list[str]:
                 current = ""
             if part:
                 chunks.append(part)
-        if not sentence:
-            continue
-        candidate = f"{current} {sentence}".strip()
-        if current and len(candidate) > limit:
-            chunks.append(current)
-            current = sentence
-        else:
-            current = candidate
+        if sentence:
+            candidate = f"{current} {sentence}".strip()
+            if current and len(candidate) > limit:
+                chunks.append(current)
+                current = sentence
+            else:
+                current = candidate
     if current:
         chunks.append(current)
     return chunks
@@ -93,19 +90,43 @@ class SpeechOutput:
         if not pygame.mixer.get_init():
             pygame.mixer.init()
 
+        async def save_audio(phrase: str, filename: str) -> None:
+            communicate = edge_tts.Communicate(
+                phrase, voice, rate="-2%", pitch="-2Hz", volume="+0%"
+            )
+            await communicate.save(filename)
+            if not os.path.exists(filename) or os.path.getsize(filename) < 256:
+                raise RuntimeError("Edge TTS вернул пустой аудиофайл")
+
         async def prepare_audio():
             try:
-                for phrase in chunks:
+                index = 0
+                while index < len(chunks):
                     fd, filename = tempfile.mkstemp(
                         suffix=".mp3", prefix="jarvis_voice_"
                     )
                     os.close(fd)
                     temporary_files.append(filename)
-                    communicate = edge_tts.Communicate(
-                        phrase, voice, rate="-2%", pitch="-2Hz", volume="+0%"
-                    )
-                    await communicate.save(filename)
-                    audio_queue.put(("file", filename))
+                    try:
+                        await save_audio(chunks[index], filename)
+                        audio_queue.put(("file", filename))
+                        index += 1
+                    except Exception:
+                        # Если короткая фраза не озвучилась, повторяем остаток
+                        # ответа одним запросом к Edge TTS.
+                        try:
+                            Path(filename).unlink(missing_ok=True)
+                        except OSError:
+                            pass
+                        fallback = " ".join(chunks[index:]).strip()
+                        fd, fallback_file = tempfile.mkstemp(
+                            suffix=".mp3", prefix="jarvis_voice_fallback_"
+                        )
+                        os.close(fd)
+                        temporary_files.append(fallback_file)
+                        await save_audio(fallback, fallback_file)
+                        audio_queue.put(("file", fallback_file))
+                        break
             except Exception as exc:
                 audio_queue.put(("error", exc))
             finally:

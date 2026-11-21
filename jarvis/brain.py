@@ -9,10 +9,10 @@ from .config import APP_DIR
 
 HISTORY_FILE = APP_DIR / "conversation.json"
 MEMORY_FILE = APP_DIR / "memory.json"
-MAX_HISTORY_MESSAGES = 20
-MAX_HISTORY_CHARS = 10500
+MAX_HISTORY_MESSAGES = 12
+MAX_HISTORY_CHARS = 6000
 MAX_MEMORIES = 50
-MAX_MEMORY_CHARS = 3500
+MAX_MEMORY_CHARS = 2200
 
 SYSTEM_PROMPT = (
     "Твоё имя — Джарвис. Ты личный цифровой помощник с характером: спокойный, "
@@ -186,8 +186,8 @@ class JarvisBrain:
         messages.extend(self._context_messages())
         messages.append({"role": "user", "content": clean_text})
         payload = {
-            "model": model, "messages": messages, "stream": False, "keep_alive": "30m",
-            "options": {"temperature": 0.55, "num_predict": 384, "num_ctx": 4096,
+            "model": model, "messages": messages, "stream": False, "keep_alive": "2h",
+            "options": {"temperature": 0.5, "num_predict": 160, "num_ctx": 3072,
                         "repeat_penalty": 1.08},
         }
         request = urllib.request.Request(

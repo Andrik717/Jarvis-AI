@@ -71,6 +71,12 @@ class JarvisWindow:
                            selectbackground="#24515d", relief="flat", wrap="word",
                            font=("Segoe UI", 11), padx=14, pady=8, height=9, borderwidth=0)
         self.log.pack(fill="both", expand=True, padx=4, pady=(0, 8))
+        self.log.bind("<Control-c>", self._copy_selection)
+        self.log.bind("<Control-C>", self._copy_selection)
+        self.log.bind("<Control-Insert>", self._copy_selection)
+        self.context_menu = tk.Menu(self.root, tearoff=0)
+        self.context_menu.add_command(label="Копировать", command=self._copy_selection)
+        self.log.bind("<Button-3>", self._show_context_menu)
         if self.brain.history:
             self._append("СИСТЕМА: Предыдущая история диалога восстановлена.")
             for item in self.brain.history[-10:]:
@@ -88,6 +94,11 @@ class JarvisWindow:
             activebackground="#25495a", activeforeground=TEXT,
             relief="flat", bd=0, cursor="hand2", padx=14, pady=11)
         self.voice_button.pack(side="left")
+        tk.Button(
+            controls, text="КОПИРОВАТЬ", command=self._copy_selection,
+            font=("Segoe UI", 9, "bold"), bg="#18313f", fg=TEXT,
+            activebackground="#25495a", activeforeground=TEXT,
+            relief="flat", bd=0, cursor="hand2", padx=12, pady=11).pack(side="left", padx=(8, 0))
         tk.Button(
             controls, text="ОЧИСТИТЬ ПАМЯТЬ", command=self.clear_memory,
             font=("Segoe UI", 9, "bold"), bg="#4a2930", fg=TEXT,
@@ -107,6 +118,23 @@ class JarvisWindow:
     def _append(self, line: str):
         self.log.insert("end", line + "\n")
         self.log.see("end")
+
+    def _copy_selection(self, event=None):
+        try:
+            selected = self.log.get("sel.first", "sel.last")
+        except tk.TclError:
+            selected = ""
+        if selected:
+            self.root.clipboard_clear()
+            self.root.clipboard_append(selected)
+            self.status.set("ТЕКСТ СКОПИРОВАН")
+        return "break"
+
+    def _show_context_menu(self, event):
+        try:
+            self.context_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.context_menu.grab_release()
 
     def _ui(self, fn, *args):
         try:

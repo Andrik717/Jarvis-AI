@@ -134,6 +134,10 @@ class JarvisWindow:
         )
         self.voice_button.configure(state="disabled" if busy else "normal")
 
+    def _finish_busy(self):
+        # Вызывается только в главном потоке Tkinter.
+        self._set_busy(False, self.status.get())
+
     def listen(self):
         if self._busy:
             return
@@ -155,7 +159,7 @@ class JarvisWindow:
             self._ui(messagebox.showerror, "Jarvis AI — ошибка", str(exc))
             self._ui(self.status.set, "ПРОВЕРЬТЕ МИКРОФОН И НАСТРОЙКИ")
         finally:
-            self._ui(self._set_busy, False, self.status.get())
+            self._ui(self._finish_busy)
 
     def test_voice(self):
         if self._busy:

@@ -1,12 +1,28 @@
 """Естественная нейросетевая озвучка Edge TTS с резервным Windows SAPI."""
 from __future__ import annotations
+
 import asyncio
 import os
+import re
 import tempfile
 import time
 from pathlib import Path
 import platform
+
 from .config import Settings
+
+
+def _speech_text(value: str) -> str:
+    """Убирает разметку, которую не нужно читать вслух."""
+    text = str(value or "")
+    text = re.sub(r"```.*?```", " Фрагмент кода опущен. ", text, flags=re.S)
+    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+    text = re.sub(r"https?://\S+", "ссылка", text)
+    text = re.sub(r"^\s{0,3}#{1,6}\s*", "", text, flags=re.M)
+    text = re.sub(r"[*_~`]", "", text)
+    text = re.sub(r"^\s*[-•]\s+", "", text, flags=re.M)
+    text = re.sub(r"\n{2,}", ". ", text)
+    return " ".join(text.split()).strip()
 
 
 class SpeechOutput:
@@ -34,9 +50,13 @@ class SpeechOutput:
     def _edge(self, text: str) -> None:
         import edge_tts
         import pygame
+
         voice = getattr(self.settings, "tts_voice", "ru-RU-SvetlanaNeural")
+
         async def synthesize(path):
-            communicate = edge_tts.Communicate(text, voice, rate="+4%", volume="+0%")
+            communicate = edge_tts.Communicate(
+                text, voice, rate="-2%", pitch="-2Hz", volume="+0%"
+            )
             await communicate.save(path)
 
         fd, filename = tempfile.mkstemp(suffix=".mp3", prefix="jarvis_voice_")
@@ -57,7 +77,7 @@ class SpeechOutput:
                 pass
 
     def speak(self, text: str) -> None:
-        text = " ".join(str(text).split())
+        text = _speech_text(text)
         if not text:
             return
         if self.settings.tts_backend == "edge":

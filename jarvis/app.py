@@ -10,6 +10,7 @@ from .audio import Microphone
 from .asr import SpeechRecognizer
 from .brain import JarvisBrain
 from .tts import SpeechOutput
+from .pc_control import handle_command
 
 BG = "#07131d"
 PANEL = "#0d202d"
@@ -192,7 +193,9 @@ class JarvisWindow:
                 return
             self._ui(self._append, "ВЫ: " + recognized)
             self._ui(self.status.set, "ДУМАЮ…")
-            answer = self.brain.reply(recognized)
+            answer = handle_command(recognized)
+            if answer is None:
+                answer = self.brain.reply(recognized)
             self._ui(self._append, "ДЖАРВИС: " + answer)
             self._ui(self._set_last_answer, answer)
             self._ui(self.status.set, "ОТВЕЧАЮ ГОЛОСОМ…")

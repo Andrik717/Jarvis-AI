@@ -1,12 +1,10 @@
-"""Надёжная пофразовая озвучка Edge TTS с повторами и резервной генерацией."""
+"""Надёжная цельная озвучка Edge TTS закреплённым мужским голосом Дмитрия."""
 from __future__ import annotations
 
 import asyncio
 import os
-import queue
 import re
 import tempfile
-import threading
 import time
 from pathlib import Path
 import platform
@@ -24,36 +22,6 @@ def _speech_text(value: str) -> str:
     text = re.sub(r"^\s*[-•]\s+", "", text, flags=re.M)
     text = re.sub(r"\n{2,}", ". ", text)
     return " ".join(text.split()).strip()
-
-
-def _speech_chunks(text: str, limit: int = 260) -> list[str]:
-    sentences = re.split(r"(?<=[.!?…])\s+", text)
-    chunks: list[str] = []
-    current = ""
-    for sentence in sentences:
-        sentence = sentence.strip()
-        if not sentence:
-            continue
-        while len(sentence) > limit:
-            cut = sentence.rfind(" ", 0, limit + 1)
-            if cut < 1:
-                cut = limit
-            part, sentence = sentence[:cut].strip(), sentence[cut:].strip()
-            if current:
-                chunks.append(current)
-                current = ""
-            if part:
-                chunks.append(part)
-        if sentence:
-            candidate = f"{current} {sentence}".strip()
-            if current and len(candidate) > limit:
-                chunks.append(current)
-                current = sentence
-            else:
-                current = candidate
-    if current:
-        chunks.append(current)
-    return chunks
 
 
 class SpeechOutput:
@@ -82,102 +50,40 @@ class SpeechOutput:
         import edge_tts
         import pygame
 
-        voice = "ru-RU-DmitryNeural"  # Закреплённый мужской голос Джарвиса
-        chunks = _speech_chunks(text)
-        audio_queue: queue.Queue = queue.Queue()
-        temporary_files: list[str] = []
-
-        if not pygame.mixer.get_init():
-            pygame.mixer.init()
-
-        async def save_audio(phrase: str, filename: str) -> None:
-            last_error = None
-            # Edge TTS иногда закрывает соединение без аудио. Повторяем запрос,
-            # прежде чем переходить к резервному варианту.
-            for attempt in range(3):
-                try:
-                    Path(filename).unlink(missing_ok=True)
-                    communicate = edge_tts.Communicate(
-                        phrase, voice, rate="-2%", pitch="-2Hz", volume="+0%"
-                    )
-                    await communicate.save(filename)
-                    if not os.path.exists(filename) or os.path.getsize(filename) < 256:
-                        raise RuntimeError("Edge TTS вернул пустой аудиофайл")
-                    return
-                except Exception as exc:
-                    last_error = exc
-                    if attempt < 2:
-                        await asyncio.sleep(0.6 * (attempt + 1))
-            raise RuntimeError(f"Edge TTS не создал аудио после 3 попыток: {last_error}")
-
-        async def prepare_audio():
-            try:
-                index = 0
-                while index < len(chunks):
-                    fd, filename = tempfile.mkstemp(
-                        suffix=".mp3", prefix="jarvis_voice_"
-                    )
-                    os.close(fd)
-                    temporary_files.append(filename)
-                    try:
-                        await save_audio(chunks[index], filename)
-                        audio_queue.put(("file", filename))
-                        index += 1
-                        # Небольшая пауза снижает риск ограничения частоты запросов.
-                        await asyncio.sleep(0.2)
-                    except Exception:
-                        Path(filename).unlink(missing_ok=True)
-                        fallback = " ".join(chunks[index:]).strip()
-                        fd, fallback_file = tempfile.mkstemp(
-                            suffix=".mp3", prefix="jarvis_voice_fallback_"
-                        )
-                        os.close(fd)
-                        temporary_files.append(fallback_file)
-                        await save_audio(fallback, fallback_file)
-                        audio_queue.put(("file", fallback_file))
-                        break
-            except Exception as exc:
-                audio_queue.put(("error", exc))
-            finally:
-                audio_queue.put(("done", None))
-
-        def producer():
-            asyncio.run(prepare_audio())
-
-        worker = threading.Thread(target=producer, daemon=True)
-        worker.start()
+        voice = "ru-RU-DmitryNeural"
+        fd, filename = tempfile.mkstemp(suffix=".mp3", prefix="jarvis_dmitry_")
+        os.close(fd)
         try:
-            while True:
-                kind, value = audio_queue.get()
-                if kind == "done":
-                    break
-                if kind == "error":
-                    raise value
-                pygame.mixer.music.load(value)
-                pygame.mixer.music.play()
-                while pygame.mixer.music.get_busy():
-                    time.sleep(0.04)
-                pygame.mixer.music.unload()
+            Path(filename).unlink(missing_ok=True)
+
+            async def synthesize() -> None:
+                communicate = edge_tts.Communicate(
+                    text=text, voice=voice, rate="-2%", pitch="-2Hz", volume="+0%"
+                )
+                await communicate.save(filename)
+
+            # Возвращаем цельную генерацию: именно этот вариант раньше
+            # давал пользователю подтверждённый мужской голос.
+            asyncio.run(synthesize())
+            if not os.path.exists(filename) or os.path.getsize(filename) < 256:
+                raise RuntimeError("Edge TTS не создал аудио для ru-RU-DmitryNeural")
+
+            if not pygame.mixer.get_init():
+                pygame.mixer.init()
+            pygame.mixer.music.load(filename)
+            pygame.mixer.music.play()
+            while pygame.mixer.music.get_busy():
+                time.sleep(0.04)
+            pygame.mixer.music.unload()
         finally:
-            worker.join()
             try:
                 pygame.mixer.music.stop()
                 pygame.mixer.music.unload()
             except Exception:
                 pass
-            for filename in temporary_files:
-                try:
-                    Path(filename).unlink(missing_ok=True)
-                except OSError:
-                    pass
+            Path(filename).unlink(missing_ok=True)
 
     def speak(self, text: str) -> None:
         text = _speech_text(text)
-        if not text:
-            return
-        if self.settings.tts_backend == "edge":
+        if text:
             self._edge(text)
-        elif self.settings.tts_backend == "sapi":
-            self._sapi().Speak(text, 0)
-        else:
-            raise RuntimeError(f"Неизвестный TTS backend: {self.settings.tts_backend}")

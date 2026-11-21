@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.py[cod]
+.env
+*.log
+dist/
+build/
+*.spec
+%APPDATA%/
+settings.local.json
+*.wav
+*.mp3
+*.flac

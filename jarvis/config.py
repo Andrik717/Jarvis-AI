@@ -31,6 +31,13 @@ def load_settings() -> Settings:
             data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             data = {}
+    # Миграция старых настроек: не оставляем прежний роботизированный SAPI по умолчанию.
+    if data.get("tts_backend") == "sapi":
+        data["tts_backend"] = "edge"
+    if not data.get("llm_base_url"):
+        data["llm_base_url"] = "http://localhost:11434"
+    if not data.get("llm_model"):
+        data["llm_model"] = "qwen2.5:3b"
     allowed = Settings.__dataclass_fields__.keys()
     return Settings(**{k: v for k, v in data.items() if k in allowed})
 

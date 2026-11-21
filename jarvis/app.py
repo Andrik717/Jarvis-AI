@@ -86,6 +86,30 @@ class JarvisWindow:
         self.log.bind("<Button-3>", self._show_context_menu)
         self.log.bind("<Control-a>", self._select_all)
         self.log.bind("<Control-A>", self._select_all)
+
+        # Отдельный текстовый ввод: микрофон запускается только кнопкой выше.
+        text_frame = tk.Frame(self.root, bg=PANEL, highlightthickness=1,
+                              highlightbackground="#173747")
+        text_frame.pack(fill="x", padx=28, pady=(0, 8))
+        tk.Label(text_frame, text="ТЕКСТОВАЯ КОНСОЛЬ — НАПИШИТЕ ДЖАРВИСУ",
+                 bg=PANEL, fg=CYAN, font=("Segoe UI", 9, "bold"),
+                 anchor="w").pack(fill="x", padx=12, pady=(8, 4))
+        input_row = tk.Frame(text_frame, bg=PANEL)
+        input_row.pack(fill="x", padx=10, pady=(0, 10))
+        self.text_input = tk.Entry(
+            input_row, bg="#102a38", fg=TEXT, insertbackground=TEXT,
+            relief="flat", font=("Segoe UI", 11),
+        )
+        self.text_input.pack(side="left", fill="x", expand=True, ipady=10, padx=(0, 8))
+        self.text_input.bind("<Return>", self.send_text)
+        self.send_button = tk.Button(
+            input_row, text="ОТПРАВИТЬ", command=self.send_text,
+            font=("Segoe UI", 9, "bold"), bg=GREEN, fg="#ffffff",
+            activebackground="#1b5962", activeforeground="#ffffff",
+            disabledforeground="#a7bec4", relief="flat", bd=0,
+            cursor="hand2", padx=18, pady=10,
+        )
+        self.send_button.pack(side="right")
         if self.brain.history:
             self._append("СИСТЕМА: Предыдущая история диалога восстановлена.")
             for item in self.brain.history[-10:]:
@@ -337,6 +361,8 @@ class JarvisWindow:
             state="disabled" if busy else "normal",
             text="ОБРАБАТЫВАЮ… ПОДОЖДИТЕ" if busy else "🎙   НАЖМИТЕ, ЧТОБЫ ГОВОРИТЬ")
         self.voice_button.configure(state="disabled" if busy else "normal")
+        self.send_button.configure(state="disabled" if busy else "normal")
+        self.text_input.configure(state="disabled" if busy else "normal")
 
     def _finish_busy(self):
         self._set_busy(False, self.status.get())
@@ -346,6 +372,33 @@ class JarvisWindow:
             return
         self._set_busy(True, "СЛУШАЮ… ГОВОРИТЕ В МИКРОФОН")
         threading.Thread(target=self._listen_worker, daemon=True).start()
+
+    def send_text(self, event=None):
+        """Отправляет набранный текст, не включая микрофон и озвучку."""
+        if self._busy:
+            return "break"
+        question = self.text_input.get().strip()
+        if not question:
+            return "break"
+        self.text_input.delete(0, "end")
+        self._append("ВЫ: " + question)
+        self._set_busy(True, "ОБРАБАТЫВАЮ ТЕКСТОВЫЙ ЗАПРОС…")
+        threading.Thread(target=self._text_worker, args=(question,), daemon=True).start()
+        return "break"
+
+    def _text_worker(self, question: str):
+        try:
+            answer = handle_command(question)
+            if answer is None:
+                answer = self.brain.reply(question)
+            self._ui(self._append, "ДЖАРВИС: " + answer)
+            self._ui(self._set_last_answer, answer)
+            self._ui(self.status.set, "ГОТОВ. МОЖЕТЕ НАПИСАТЬ СЛЕДУЮЩИЙ ВОПРОС.")
+        except Exception as exc:
+            self._ui(self._append, "ОШИБКА: " + str(exc))
+            self._ui(self.status.set, "НЕ УДАЛОСЬ ОБРАБОТАТЬ ТЕКСТОВЫЙ ЗАПРОС")
+        finally:
+            self._ui(self._finish_busy)
 
     def _listen_worker(self):
         try:

@@ -1,15 +1,15 @@
-"""Основное окно Jarvis AI: крупные видимые элементы управления."""
+"""Основное окно Jarvis AI: голосовой диалог, локальный ИИ и настройки."""
 from __future__ import annotations
 
 import threading
 import tkinter as tk
 from tkinter import messagebox
 
-from .config import load_settings
+from .config import load_settings, save_settings
 from .audio import Microphone
 from .asr import SpeechRecognizer
+from .brain import JarvisBrain
 from .tts import SpeechOutput
-
 
 BG = "#07131d"
 PANEL = "#0d202d"
@@ -24,95 +24,74 @@ class JarvisWindow:
         self.settings = load_settings()
         self.mic = Microphone()
         self.asr = SpeechRecognizer(self.settings)
+        self.brain = JarvisBrain(self.settings)
         self.tts = SpeechOutput(self.settings)
         self._busy = False
 
         self.root = tk.Tk()
         self.root.title("JARVIS AI — голосовой помощник")
-        self.root.geometry("900x680")
-        self.root.minsize(720, 560)
+        self.root.geometry("940x720")
+        self.root.minsize(760, 600)
         self.root.configure(bg=BG)
         self.root.protocol("WM_DELETE_WINDOW", self.root.destroy)
         self._build()
 
     def _build(self):
-        # Используем обычные tk.Button: они заметнее и предсказуемее,
-        # чем системные ttk-кнопки на разных темах Windows.
         header = tk.Frame(self.root, bg=BG)
-        header.pack(fill="x", padx=28, pady=(22, 8))
-
-        tk.Label(
-            header, text="J.A.R.V.I.S.", bg=BG, fg=CYAN,
-            font=("Segoe UI", 28, "bold")
-        ).pack()
-        tk.Label(
-            header, text="РУССКИЙ ГОЛОСОВОЙ ПОМОЩНИК",
-            bg=BG, fg=MUTED, font=("Segoe UI", 10, "bold")
-        ).pack(pady=(2, 0))
+        header.pack(fill="x", padx=28, pady=(18, 8))
+        tk.Label(header, text="J.A.R.V.I.S.", bg=BG, fg=CYAN,
+                 font=("Segoe UI", 28, "bold")).pack()
+        tk.Label(header, text="ГОЛОСОВОЙ ИИ-ПОМОЩНИК",
+                 bg=BG, fg=MUTED, font=("Segoe UI", 10, "bold")).pack(pady=(2, 0))
 
         status_panel = tk.Frame(self.root, bg=PANEL, highlightthickness=1,
                                 highlightbackground="#173747")
-        status_panel.pack(fill="x", padx=28, pady=(14, 12))
+        status_panel.pack(fill="x", padx=28, pady=(12, 10))
         self.status = tk.StringVar(value="ГОТОВ К РАБОТЕ")
-        tk.Label(
-            status_panel, textvariable=self.status, bg=PANEL, fg=CYAN,
-            font=("Segoe UI", 12, "bold"), pady=12
-        ).pack()
+        tk.Label(status_panel, textvariable=self.status, bg=PANEL, fg=CYAN,
+                 font=("Segoe UI", 11, "bold"), pady=10).pack()
 
-        # Главная кнопка находится отдельно и занимает всю ширину.
         self.listen_button = tk.Button(
-            self.root,
-            text="🎙   НАЖМИТЕ, ЧТОБЫ ГОВОРИТЬ",
-            command=self.listen,
-            font=("Segoe UI", 16, "bold"),
-            bg=GREEN, fg="#ffffff", activebackground="#1b5962",
-            activeforeground="#ffffff", disabledforeground="#a7bec4",
-            relief="flat", bd=0, cursor="hand2",
-            padx=18, pady=22
-        )
-        self.listen_button.pack(fill="x", padx=28, pady=(4, 12))
+            self.root, text="🎙   НАЖМИТЕ, ЧТОБЫ ГОВОРИТЬ", command=self.listen,
+            font=("Segoe UI", 16, "bold"), bg=GREEN, fg="#ffffff",
+            activebackground="#1b5962", activeforeground="#ffffff",
+            disabledforeground="#a7bec4", relief="flat", bd=0, cursor="hand2",
+            padx=18, pady=20)
+        self.listen_button.pack(fill="x", padx=28, pady=(4, 8))
 
-        hint = tk.Label(
-            self.root,
-            text="После нажатия говорите в микрофон в течение 5 секунд.",
-            bg=BG, fg=MUTED, font=("Segoe UI", 10)
-        )
-        hint.pack(pady=(0, 8))
+        tk.Label(self.root,
+                 text="Говорите после нажатия. Джарвис распознает фразу, ответит и произнесёт ответ.",
+                 bg=BG, fg=MUTED, font=("Segoe UI", 9)).pack(pady=(0, 8))
 
         log_frame = tk.Frame(self.root, bg=PANEL)
         log_frame.pack(fill="both", expand=True, padx=28, pady=8)
-
-        tk.Label(
-            log_frame, text="ЖУРНАЛ ДИАЛОГА", bg=PANEL, fg=CYAN,
-            font=("Segoe UI", 9, "bold"), anchor="w"
-        ).pack(fill="x", padx=14, pady=(12, 4))
-
-        self.log = tk.Text(
-            log_frame, bg=PANEL, fg=TEXT, insertbackground=TEXT,
-            selectbackground="#24515d", relief="flat", wrap="word",
-            font=("Segoe UI", 11), padx=14, pady=8, height=8,
-            borderwidth=0
-        )
+        tk.Label(log_frame, text="ИСТОРИЯ ДИАЛОГА", bg=PANEL, fg=CYAN,
+                 font=("Segoe UI", 9, "bold"), anchor="w").pack(fill="x", padx=14, pady=(10, 4))
+        self.log = tk.Text(log_frame, bg=PANEL, fg=TEXT, insertbackground=TEXT,
+                           selectbackground="#24515d", relief="flat", wrap="word",
+                           font=("Segoe UI", 11), padx=14, pady=8, height=9, borderwidth=0)
         self.log.pack(fill="both", expand=True, padx=4, pady=(0, 8))
-        self._append("JARVIS: Система запущена. Нажмите большую кнопку выше и произнесите фразу.")
+        self._append("ДЖАРВИС: Система запущена. Я готов к разговору.")
+        self._append("ПОДСКАЗКА: для работы ИИ установи Ollama и модель qwen2.5:3b.")
 
         controls = tk.Frame(self.root, bg=BG)
-        controls.pack(fill="x", padx=28, pady=(10, 22))
-
+        controls.pack(fill="x", padx=28, pady=(8, 18))
         self.voice_button = tk.Button(
             controls, text="ПРОВЕРИТЬ ГОЛОС", command=self.test_voice,
-            font=("Segoe UI", 10, "bold"), bg="#18313f", fg=TEXT,
+            font=("Segoe UI", 9, "bold"), bg="#18313f", fg=TEXT,
             activebackground="#25495a", activeforeground=TEXT,
-            relief="flat", bd=0, cursor="hand2", padx=18, pady=12
-        )
+            relief="flat", bd=0, cursor="hand2", padx=14, pady=11)
         self.voice_button.pack(side="left")
-
+        tk.Button(
+            controls, text="НАСТРОЙКИ ИИ", command=self.open_settings,
+            font=("Segoe UI", 9, "bold"), bg="#18313f", fg=TEXT,
+            activebackground="#25495a", activeforeground=TEXT,
+            relief="flat", bd=0, cursor="hand2", padx=14, pady=11).pack(side="left", padx=8)
         tk.Button(
             controls, text="ВЫХОД", command=self.root.destroy,
-            font=("Segoe UI", 10, "bold"), bg="#26323a", fg=TEXT,
+            font=("Segoe UI", 9, "bold"), bg="#26323a", fg=TEXT,
             activebackground="#3a4b55", activeforeground=TEXT,
-            relief="flat", bd=0, cursor="hand2", padx=18, pady=12
-        ).pack(side="right")
+            relief="flat", bd=0, cursor="hand2", padx=14, pady=11).pack(side="right")
 
     def _append(self, line: str):
         self.log.insert("end", line + "\n")
@@ -129,13 +108,10 @@ class JarvisWindow:
         self.status.set(status)
         self.listen_button.configure(
             state="disabled" if busy else "normal",
-            text="РАБОТАЮ… ПОЖАЛУЙСТА, ПОДОЖДИТЕ" if busy
-                 else "🎙   НАЖМИТЕ, ЧТОБЫ ГОВОРИТЬ"
-        )
+            text="ОБРАБАТЫВАЮ… ПОДОЖДИТЕ" if busy else "🎙   НАЖМИТЕ, ЧТОБЫ ГОВОРИТЬ")
         self.voice_button.configure(state="disabled" if busy else "normal")
 
     def _finish_busy(self):
-        # Вызывается только в главном потоке Tkinter.
         self._set_busy(False, self.status.get())
 
     def listen(self):
@@ -147,37 +123,86 @@ class JarvisWindow:
     def _listen_worker(self):
         try:
             audio = self.mic.record(5.0)
-            self._ui(self.status.set, "РАСПОЗНАЮ РЕЧЬ… ПЕРВЫЙ ЗАПУСК МОЖЕТ ЗАНЯТЬ ВРЕМЯ")
+            self._ui(self.status.set, "РАСПОЗНАЮ РЕЧЬ…")
             recognized = self.asr.transcribe(audio)
-            if recognized:
-                self._ui(self._append, "ВЫ: " + recognized)
-                self._ui(self.status.set, "ГОТОВО. МОЖЕТЕ ГОВОРИТЬ ЕЩЁ РАЗ.")
-            else:
-                self._ui(self.status.set, "РЕЧЬ НЕ ОБНАРУЖЕНА. ПОПРОБУЙТЕ ЕЩЁ РАЗ.")
+            if not recognized:
+                self._ui(self.status.set, "РЕЧЬ НЕ РАСПОЗНАНА. ПОПРОБУЙТЕ ЕЩЁ РАЗ.")
+                return
+            self._ui(self._append, "ВЫ: " + recognized)
+            self._ui(self.status.set, "ДУМАЮ…")
+            answer = self.brain.reply(recognized)
+            self._ui(self._append, "ДЖАРВИС: " + answer)
+            self._ui(self.status.set, "ОТВЕЧАЮ ГОЛОСОМ…")
+            self.tts.speak(answer)
+            self._ui(self.status.set, "ГОТОВ. МОЖЕТЕ ГОВОРИТЬ ЕЩЁ РАЗ.")
         except Exception as exc:
             self._ui(self._append, "ОШИБКА: " + str(exc))
-            self._ui(messagebox.showerror, "Jarvis AI — ошибка", str(exc))
-            self._ui(self.status.set, "ПРОВЕРЬТЕ МИКРОФОН И НАСТРОЙКИ")
+            self._ui(self.status.set, "НЕ УДАЛОСЬ ОБРАБОТАТЬ ЗАПРОС — СМОТРИТЕ ЖУРНАЛ")
         finally:
             self._ui(self._finish_busy)
 
     def test_voice(self):
         if self._busy:
             return
-        self._set_busy(True, "ПРОВЕРЯЮ РУССКИЙ ГОЛОС…")
-
+        self._set_busy(True, "ПРОВЕРЯЮ НЕЙРОСЕТЕВОЙ РУССКИЙ ГОЛОС…")
         def worker():
             try:
-                self.tts.speak("Привет. Я Джарвис. Проверка русского голоса прошла.")
-                self._ui(self.status.set, "КОМАНДА ОЗВУЧИВАНИЯ ОТПРАВЛЕНА")
+                self.tts.speak("Здравствуйте. Я Джарвис. Теперь я говорю более естественным голосом.")
+                self._ui(self.status.set, "ПРОВЕРКА ГОЛОСА ЗАВЕРШЕНА")
             except Exception as exc:
                 self._ui(self._append, "ОШИБКА ГОЛОСА: " + str(exc))
-                self._ui(messagebox.showerror, "Синтез речи", str(exc))
-                self._ui(self.status.set, "НЕ УДАЛОСЬ ЗАПУСТИТЬ ГОЛОС")
+                self._ui(self.status.set, "НЕ УДАЛОСЬ ЗАПУСТИТЬ НЕЙРОСЕТЕВОЙ ГОЛОС")
             finally:
                 self._ui(self._finish_busy)
-
         threading.Thread(target=worker, daemon=True).start()
+
+    def open_settings(self):
+        if self._busy:
+            return
+        win = tk.Toplevel(self.root)
+        win.title("Настройки Джарвиса")
+        win.configure(bg=BG)
+        win.resizable(False, False)
+        win.transient(self.root)
+        win.grab_set()
+        frame = tk.Frame(win, bg=BG, padx=22, pady=18)
+        frame.pack(fill="both", expand=True)
+
+        tk.Label(frame, text="МОЗГ И ГОЛОС", bg=BG, fg=CYAN,
+                 font=("Segoe UI", 16, "bold")).pack(anchor="w", pady=(0, 12))
+        fields = [
+            ("Адрес Ollama", self.settings.llm_base_url, "url"),
+            ("Модель ИИ", self.settings.llm_model, "model"),
+            ("Русский голос", self.settings.tts_voice, "voice"),
+        ]
+        entries = {}
+        for label, value, key in fields:
+            tk.Label(frame, text=label, bg=BG, fg=TEXT,
+                     font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(7, 3))
+            entry = tk.Entry(frame, width=46, font=("Segoe UI", 10),
+                             bg=PANEL, fg=TEXT, insertbackground=TEXT, relief="flat")
+            entry.insert(0, value)
+            entry.pack(fill="x", ipady=7)
+            entries[key] = entry
+
+        tk.Label(frame, text="Голоса: ru-RU-SvetlanaNeural (женский), ru-RU-DmitryNeural (мужской).",
+                 bg=BG, fg=MUTED, font=("Segoe UI", 8), wraplength=390,
+                 justify="left").pack(anchor="w", pady=(10, 12))
+
+        def save():
+            self.settings.llm_base_url = entries["url"].get().strip() or "http://localhost:11434"
+            self.settings.llm_model = entries["model"].get().strip() or "qwen2.5:3b"
+            self.settings.tts_voice = entries["voice"].get().strip() or "ru-RU-SvetlanaNeural"
+            self.settings.tts_backend = "edge"
+            save_settings(self.settings)
+            self.brain.settings = self.settings
+            self.tts.settings = self.settings
+            self._append("СИСТЕМА: Настройки сохранены.")
+            win.destroy()
+
+        tk.Button(frame, text="СОХРАНИТЬ", command=save, bg=GREEN, fg="white",
+                  activebackground="#1b5962", relief="flat", padx=18, pady=10,
+                  font=("Segoe UI", 10, "bold")).pack(fill="x", pady=(4, 0))
 
     def run(self):
         self.root.mainloop()

@@ -1,4 +1,4 @@
-"""Быстрая пофразовая озвучка Edge TTS с резервной генерацией целого ответа."""
+"""Надёжная пофразовая озвучка Edge TTS с повторами и резервной генерацией."""
 from __future__ import annotations
 
 import asyncio
@@ -26,7 +26,7 @@ def _speech_text(value: str) -> str:
     return " ".join(text.split()).strip()
 
 
-def _speech_chunks(text: str, limit: int = 180) -> list[str]:
+def _speech_chunks(text: str, limit: int = 260) -> list[str]:
     sentences = re.split(r"(?<=[.!?…])\s+", text)
     chunks: list[str] = []
     current = ""
@@ -82,7 +82,7 @@ class SpeechOutput:
         import edge_tts
         import pygame
 
-        voice = "ru-RU-DmitryNeural"
+        voice = self.settings.tts_voice or "ru-RU-DmitryNeural"
         chunks = _speech_chunks(text)
         audio_queue: queue.Queue = queue.Queue()
         temporary_files: list[str] = []
@@ -91,12 +91,24 @@ class SpeechOutput:
             pygame.mixer.init()
 
         async def save_audio(phrase: str, filename: str) -> None:
-            communicate = edge_tts.Communicate(
-                phrase, voice, rate="-2%", pitch="-2Hz", volume="+0%"
-            )
-            await communicate.save(filename)
-            if not os.path.exists(filename) or os.path.getsize(filename) < 256:
-                raise RuntimeError("Edge TTS вернул пустой аудиофайл")
+            last_error = None
+            # Edge TTS иногда закрывает соединение без аудио. Повторяем запрос,
+            # прежде чем переходить к резервному варианту.
+            for attempt in range(3):
+                try:
+                    Path(filename).unlink(missing_ok=True)
+                    communicate = edge_tts.Communicate(
+                        phrase, voice, rate="-2%", pitch="-2Hz", volume="+0%"
+                    )
+                    await communicate.save(filename)
+                    if not os.path.exists(filename) or os.path.getsize(filename) < 256:
+                        raise RuntimeError("Edge TTS вернул пустой аудиофайл")
+                    return
+                except Exception as exc:
+                    last_error = exc
+                    if attempt < 2:
+                        await asyncio.sleep(0.6 * (attempt + 1))
+            raise RuntimeError(f"Edge TTS не создал аудио после 3 попыток: {last_error}")
 
         async def prepare_audio():
             try:
@@ -111,13 +123,10 @@ class SpeechOutput:
                         await save_audio(chunks[index], filename)
                         audio_queue.put(("file", filename))
                         index += 1
+                        # Небольшая пауза снижает риск ограничения частоты запросов.
+                        await asyncio.sleep(0.2)
                     except Exception:
-                        # Если короткая фраза не озвучилась, повторяем остаток
-                        # ответа одним запросом к Edge TTS.
-                        try:
-                            Path(filename).unlink(missing_ok=True)
-                        except OSError:
-                            pass
+                        Path(filename).unlink(missing_ok=True)
                         fallback = " ".join(chunks[index:]).strip()
                         fd, fallback_file = tempfile.mkstemp(
                             suffix=".mp3", prefix="jarvis_voice_fallback_"
@@ -171,6 +180,4 @@ class SpeechOutput:
         elif self.settings.tts_backend == "sapi":
             self._sapi().Speak(text, 0)
         else:
-            raise RuntimeError(
-                f"Неизвестный TTS backend: {self.settings.tts_backend}"
-            )
+            raise RuntimeError(f"Неизвестный TTS backend: {self.settings.tts_backend}")

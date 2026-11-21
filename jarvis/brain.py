@@ -1,4 +1,4 @@
-"""Быстрый локальный ИИ-мозг через Ollama; история диалога хранится в памяти."""
+"""Быстрый локальный ИИ-мозг через Ollama с контекстом диалога."""
 from __future__ import annotations
 
 import json
@@ -6,12 +6,21 @@ import urllib.error
 import urllib.request
 
 SYSTEM_PROMPT = (
-    "Ты Джарвис — умный, спокойный и дружелюбный голосовой помощник пользователя. "
-    "Всегда отвечай на русском языке, если пользователь явно не попросил другой. "
-    "Говори естественно, как живой собеседник: без канцелярита, длинных вступлений "
-    "и повторения вопроса. Для простых вопросов отвечай кратко, для сложных — "
-    "структурированно и по делу. Не выдумывай факты и честно говори, если не знаешь. "
-    "Не утверждай, что выполнил действие на компьютере, если инструмент этого не сделал."
+    "Ты Джарвис — персональный голосовой помощник пользователя, вдохновлённый "
+    "образом умного ассистента из фантастики. Ты спокойный, тактичный, "
+    "сообразительный, доброжелательный и немного остроумный, но не фамильярный. "
+    "Общайся на русском языке, если пользователь не попросил другой язык. "
+    "Звучь как естественный собеседник: используй живые короткие фразы, "
+    "не начинай каждый ответ с одинакового приветствия, не повторяй вопрос. "
+    "Сначала дай прямой ответ, затем необходимые пояснения. Простые вопросы "
+    "объясняй кратко; сложные задачи разбивай на понятные шаги. "
+    "Учитывай предыдущие реплики и не спрашивай повторно то, что уже известно "
+    "из текущего диалога. Если данных не хватает, задай один конкретный вопрос. "
+    "Не выдумывай факты, результаты поиска или выполненные действия. "
+    "Ты пока не управляешь компьютером напрямую: не говори, что открыл программу, "
+    "изменил файл или выполнил действие, если приложение действительно этого не сделало. "
+    "Не используй Markdown-таблицы, длинные списки и декоративные символы в "
+    "обычных голосовых ответах. Произносимый ответ должен звучать естественно."
 )
 
 
@@ -29,14 +38,19 @@ class JarvisBrain:
         if not user_text.strip():
             return ""
         messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-        messages.extend(self.history[-12:])
+        messages.extend(self.history[-20:])
         messages.append({"role": "user", "content": user_text.strip()})
         payload = {
             "model": model,
             "messages": messages,
             "stream": False,
-            "keep_alive": "10m",
-            "options": {"temperature": 0.65, "num_predict": 220, "num_ctx": 4096}
+            "keep_alive": "30m",
+            "options": {
+                "temperature": 0.62,
+                "num_predict": 300,
+                "num_ctx": 4096,
+                "repeat_penalty": 1.08,
+            },
         }
         request = urllib.request.Request(
             base + "/api/chat",
@@ -45,13 +59,13 @@ class JarvisBrain:
             method="POST",
         )
         try:
-            with urllib.request.urlopen(request, timeout=60) as response:
+            with urllib.request.urlopen(request, timeout=90) as response:
                 data = json.loads(response.read().decode("utf-8"))
         except urllib.error.URLError as exc:
             reason = getattr(exc, "reason", exc)
             raise RuntimeError(
-                "Не удалось подключиться к локальному ИИ. Установи Ollama, "
-                "запусти её и выполни команду: ollama pull qwen2.5:3b. "
+                "Не удалось подключиться к локальному ИИ. Проверь, что Ollama запущена "
+                "и модель qwen2.5:3b установлена. "
                 f"Подробности: {reason}"
             ) from exc
         answer = ((data.get("message") or {}).get("content") or "").strip()
@@ -61,5 +75,5 @@ class JarvisBrain:
             {"role": "user", "content": user_text.strip()},
             {"role": "assistant", "content": answer},
         ])
-        self.history = self.history[-16:]
+        self.history = self.history[-20:]
         return answer

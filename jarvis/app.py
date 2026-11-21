@@ -74,9 +74,10 @@ class JarvisWindow:
                            selectbackground="#24515d", relief="flat", wrap="word",
                            font=("Segoe UI", 11), padx=14, pady=8, height=9, borderwidth=0)
         self.log.pack(fill="both", expand=True, padx=4, pady=(0, 8))
-        self.log.bind("<Control-c>", self._copy_selection)
-        self.log.bind("<Control-C>", self._copy_selection)
-        self.log.bind("<Control-Insert>", self._copy_selection)
+        # Глобальные сочетания клавиш: работают даже если фокус не в поле истории.
+        self.root.bind_all("<Control-c>", self._copy_selection)
+        self.root.bind_all("<Control-C>", self._copy_selection)
+        self.root.bind_all("<Control-Insert>", self._copy_selection)
         self.context_menu = tk.Menu(self.root, tearoff=0)
         self.context_menu.add_command(label="Копировать выделенное", command=self._copy_selection)
         self.context_menu.add_command(label="Копировать весь диалог", command=self._copy_all_dialog)
@@ -207,12 +208,29 @@ class JarvisWindow:
         return True
 
     def _copy_selection(self, event=None):
+        # Берём выделение именно из того текстового поля, где находится курсор.
+        widget = self.root.focus_get()
+        selected = ""
         try:
-            selected = self.log.get("sel.first", "sel.last")
-        except tk.TclError:
-            selected = ""
-        self._put_clipboard(selected)
-        return "break"
+            if isinstance(widget, tk.Text):
+                selected = widget.get("sel.first", "sel.last")
+            elif isinstance(widget, tk.Entry):
+                first = widget.index("sel.first")
+                last = widget.index("sel.last")
+                selected = widget.get()[first:last]
+            else:
+                selected = self.log.get("sel.first", "sel.last")
+        except (tk.TclError, AttributeError):
+            try:
+                selected = self.log.get("sel.first", "sel.last")
+            except tk.TclError:
+                selected = ""
+
+        if selected:
+            self._put_clipboard(selected)
+            return "break"
+        # Если ничего не выделено в другом поле, не перехватываем системный Ctrl+C.
+        return None
 
     def _copy_all_dialog(self):
         self._put_clipboard(self.log.get("1.0", "end-1c"))

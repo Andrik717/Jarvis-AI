@@ -31,7 +31,10 @@ def load_settings() -> Settings:
             data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             data = {}
-    # Более компактная Whisper Base заметно быстрее на обычном CPU, чем Small.\n    if data.get("whisper_model") == "small":\n        data["whisper_model"] = "base"\n    # Миграция старых настроек: не оставляем прежний роботизированный SAPI по умолчанию.
+    # Более компактная Whisper Base заметно быстрее на обычном CPU, чем Small.
+    if data.get("whisper_model") == "small":
+        data["whisper_model"] = "base"
+    # Миграция старых настроек: не оставляем прежний роботизированный SAPI по умолчанию.
     if data.get("tts_backend") == "sapi":
         data["tts_backend"] = "edge"
     # Переключаем прежний женский голос по умолчанию на мужской голос Джарвиса.

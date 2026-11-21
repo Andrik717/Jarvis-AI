@@ -74,13 +74,11 @@ class JarvisWindow:
                            selectbackground="#24515d", relief="flat", wrap="word",
                            font=("Segoe UI", 11), padx=14, pady=8, height=9, borderwidth=0)
         self.log.pack(fill="both", expand=True, padx=4, pady=(0, 8))
-        # Глобальные сочетания клавиш: работают даже если фокус не в поле истории.
-        self.root.bind_all("<Control-c>", self._copy_selection)
-        self.root.bind_all("<Control-C>", self._copy_selection)
-        self.root.bind_all("<Control-Insert>", self._copy_selection)
-        # Дополнительная привязка непосредственно к полю истории.
-        self.log.bind("<Control-c>", self._copy_selection, add="+")
-        self.log.bind("<Control-C>", self._copy_selection, add="+")
+        # Обрабатываем физическую клавишу C, а не только символ раскладки.
+        # В русской раскладке Tk может передавать Cyrillic_es вместо латинской c.
+        self.root.bind_all("<Control-KeyPress>", self._copy_on_ctrl_key, add="+")
+        self.log.bind("<Control-KeyPress>", self._copy_on_ctrl_key, add="+")
+        self.root.bind_all("<Control-Insert>", self._copy_selection, add="+")
         self.log.bind("<Control-Insert>", self._copy_selection, add="+")
         self.context_menu = tk.Menu(self.root, tearoff=0)
         self.context_menu.add_command(label="Копировать выделенное", command=self._copy_selection)
@@ -211,6 +209,17 @@ class JarvisWindow:
 
         self.status.set("СКОПИРОВАНО! ВСТАВЬТЕ ТЕКСТ КЛАВИШАМИ CTRL+V")
         return True
+
+    def _copy_on_ctrl_key(self, event=None):
+        if event is None:
+            return None
+        keysym = str(getattr(event, "keysym", "")).lower()
+        keycode = getattr(event, "keycode", 0)
+        # VK_C = 67 на Windows; Cyrillic_es — «с» в русской раскладке.
+        is_c = keysym in ("c", "с", "cyrillic_es") or keycode == 67
+        if is_c and (getattr(event, "state", 0) & 0x4):
+            return self._copy_selection(event)
+        return None
 
     def _copy_selection(self, event=None):
         # Событие клавиатуры надёжнее focus_get(): Tk иногда оставляет фокус

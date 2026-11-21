@@ -26,8 +26,7 @@ def _speech_text(value: str) -> str:
     return " ".join(text.split()).strip()
 
 
-def _speech_chunks(text: str, limit: int = 260, first_limit: int = 110) -> list[str]:
-    """Делит ответ так, чтобы первую короткую часть можно было озвучить быстрее."""
+def _speech_chunks(text: str, limit: int = 260) -> list[str]:
     sentences = re.split(r"(?<=[.!?…])\s+", text)
     chunks: list[str] = []
     current = ""
@@ -35,22 +34,19 @@ def _speech_chunks(text: str, limit: int = 260, first_limit: int = 110) -> list[
         sentence = sentence.strip()
         if not sentence:
             continue
-        chunk_limit = first_limit if not chunks and not current else limit
-        while len(sentence) > chunk_limit:
-            cut = sentence.rfind(" ", 0, chunk_limit + 1)
+        while len(sentence) > limit:
+            cut = sentence.rfind(" ", 0, limit + 1)
             if cut < 1:
-                cut = chunk_limit
+                cut = limit
             part, sentence = sentence[:cut].strip(), sentence[cut:].strip()
             if current:
                 chunks.append(current)
                 current = ""
             if part:
                 chunks.append(part)
-            chunk_limit = limit
         if sentence:
             candidate = f"{current} {sentence}".strip()
-            chunk_limit = first_limit if not chunks else limit
-            if current and len(candidate) > chunk_limit:
+            if current and len(candidate) > limit:
                 chunks.append(current)
                 current = sentence
             else:

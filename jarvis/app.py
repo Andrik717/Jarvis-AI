@@ -27,6 +27,7 @@ class JarvisWindow:
         self.brain = JarvisBrain(self.settings)
         self.tts = SpeechOutput(self.settings)
         self._busy = False
+        self.last_answer = ""
 
         self.root = tk.Tk()
         self.root.title("JARVIS AI — голосовой помощник")
@@ -95,7 +96,12 @@ class JarvisWindow:
             relief="flat", bd=0, cursor="hand2", padx=14, pady=11)
         self.voice_button.pack(side="left")
         tk.Button(
-            controls, text="КОПИРОВАТЬ", command=self._copy_selection,
+            controls, text="КОПИРОВАТЬ ОТВЕТ", command=self._copy_last_answer,
+            font=("Segoe UI", 9, "bold"), bg="#18313f", fg=TEXT,
+            activebackground="#25495a", activeforeground=TEXT,
+            relief="flat", bd=0, cursor="hand2", padx=12, pady=11).pack(side="left", padx=(8, 0))
+        tk.Button(
+            controls, text="КОПИРОВАТЬ ВЫДЕЛЕННОЕ", command=self._copy_selection,
             font=("Segoe UI", 9, "bold"), bg="#18313f", fg=TEXT,
             activebackground="#25495a", activeforeground=TEXT,
             relief="flat", bd=0, cursor="hand2", padx=12, pady=11).pack(side="left", padx=(8, 0))
@@ -119,16 +125,33 @@ class JarvisWindow:
         self.log.insert("end", line + "\n")
         self.log.see("end")
 
+    def _put_clipboard(self, text: str):
+        if not text:
+            self.status.set("СНАЧАЛА ВЫДЕЛИТЕ ТЕКСТ ИЛИ ДОЖДИТЕСЬ ОТВЕТА")
+            return False
+        try:
+            self.root.clipboard_clear()
+            self.root.clipboard_append(text)
+            self.root.update()
+            self.status.set("ТЕКСТ СКОПИРОВАН — МОЖНО ВСТАВИТЬ CTRL+V")
+            return True
+        except tk.TclError as exc:
+            self.status.set("ОШИБКА БУФЕРА ОБМЕНА: " + str(exc)[:70])
+            return False
+
     def _copy_selection(self, event=None):
         try:
             selected = self.log.get("sel.first", "sel.last")
         except tk.TclError:
             selected = ""
-        if selected:
-            self.root.clipboard_clear()
-            self.root.clipboard_append(selected)
-            self.status.set("ТЕКСТ СКОПИРОВАН")
+        self._put_clipboard(selected)
         return "break"
+
+    def _copy_last_answer(self):
+        self._put_clipboard(self.last_answer)
+
+    def _set_last_answer(self, answer: str):
+        self.last_answer = answer
 
     def _show_context_menu(self, event):
         try:
@@ -171,6 +194,7 @@ class JarvisWindow:
             self._ui(self.status.set, "ДУМАЮ…")
             answer = self.brain.reply(recognized)
             self._ui(self._append, "ДЖАРВИС: " + answer)
+            self._ui(self._set_last_answer, answer)
             self._ui(self.status.set, "ОТВЕЧАЮ ГОЛОСОМ…")
             self.tts.speak(answer)
             self._ui(self.status.set, "ГОТОВ. МОЖЕТЕ ГОВОРИТЬ ЕЩЁ РАЗ.")

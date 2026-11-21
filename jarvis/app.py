@@ -78,6 +78,10 @@ class JarvisWindow:
         self.root.bind_all("<Control-c>", self._copy_selection)
         self.root.bind_all("<Control-C>", self._copy_selection)
         self.root.bind_all("<Control-Insert>", self._copy_selection)
+        # Дополнительная привязка непосредственно к полю истории.
+        self.log.bind("<Control-c>", self._copy_selection, add="+")
+        self.log.bind("<Control-C>", self._copy_selection, add="+")
+        self.log.bind("<Control-Insert>", self._copy_selection, add="+")
         self.context_menu = tk.Menu(self.root, tearoff=0)
         self.context_menu.add_command(label="Копировать выделенное", command=self._copy_selection)
         self.context_menu.add_command(label="Копировать весь диалог", command=self._copy_all_dialog)
@@ -183,7 +187,8 @@ class JarvisWindow:
                     opened = True
                     if not user32.EmptyClipboard():
                         raise OSError("Не удалось очистить буфер")
-                    data = (text + "\\0").encode("utf-16-le")
+                    # CF_UNICODETEXT требует настоящий завершающий UTF-16 NUL.
+                    data = (text + "\0").encode("utf-16-le")
                     memory = kernel32.GlobalAlloc(0x0002, len(data))
                     if not memory:
                         raise OSError("Не удалось выделить память")
@@ -208,28 +213,41 @@ class JarvisWindow:
         return True
 
     def _copy_selection(self, event=None):
-        # Берём выделение именно из того текстового поля, где находится курсор.
-        widget = self.root.focus_get()
-        selected = ""
+        # Событие клавиатуры надёжнее focus_get(): Tk иногда оставляет фокус
+        # на другом элементе, хотя выделение видно в истории диалога.
+        candidates = []
+        event_widget = getattr(event, "widget", None) if event is not None else None
+        if event_widget is not None:
+            candidates.append(event_widget)
         try:
-            if isinstance(widget, tk.Text):
-                selected = widget.get("sel.first", "sel.last")
-            elif isinstance(widget, tk.Entry):
-                first = widget.index("sel.first")
-                last = widget.index("sel.last")
-                selected = widget.get()[first:last]
-            else:
-                selected = self.log.get("sel.first", "sel.last")
-        except (tk.TclError, AttributeError):
+            focused = self.root.focus_get()
+        except tk.TclError:
+            focused = None
+        if focused is not None and focused not in candidates:
+            candidates.append(focused)
+        if self.log not in candidates:
+            candidates.append(self.log)
+
+        selected = ""
+        for widget in candidates:
             try:
-                selected = self.log.get("sel.first", "sel.last")
-            except tk.TclError:
+                if isinstance(widget, tk.Text):
+                    ranges = widget.tag_ranges("sel")
+                    if len(ranges) >= 2:
+                        selected = widget.get(ranges[0], ranges[1])
+                elif isinstance(widget, tk.Entry):
+                    first = widget.index("sel.first")
+                    last = widget.index("sel.last")
+                    selected = widget.get()[first:last]
+            except (tk.TclError, AttributeError):
                 selected = ""
+            if selected:
+                break
 
         if selected:
             self._put_clipboard(selected)
             return "break"
-        # Если ничего не выделено в другом поле, не перехватываем системный Ctrl+C.
+        # Не блокируем штатное поведение Ctrl+C, если выделения нет.
         return None
 
     def _copy_all_dialog(self):

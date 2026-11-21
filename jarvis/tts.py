@@ -1,7 +1,13 @@
-"""Озвучка. SAPI — базовый Windows backend; ошибки не маскируются."""
+"""Естественная нейросетевая озвучка Edge TTS с резервным Windows SAPI."""
 from __future__ import annotations
+import asyncio
+import os
+import tempfile
+import time
+from pathlib import Path
 import platform
 from .config import Settings
+
 
 class SpeechOutput:
     def __init__(self, settings: Settings):
@@ -16,7 +22,6 @@ class SpeechOutput:
             self._engine = win32com.client.Dispatch("SAPI.SpVoice")
             self._engine.Rate = max(-10, min(10, int(self.settings.sapi_rate)))
             self._engine.Volume = max(0, min(100, int(self.settings.sapi_volume)))
-            # Предпочитаем русскую установленную системную голосовую модель.
             voices = self._engine.GetVoices()
             for i in range(voices.Count):
                 voice = voices.Item(i)
@@ -26,11 +31,38 @@ class SpeechOutput:
                     break
         return self._engine
 
+    def _edge(self, text: str) -> None:
+        import edge_tts
+        import pygame
+        voice = getattr(self.settings, "tts_voice", "ru-RU-SvetlanaNeural")
+        async def synthesize(path):
+            communicate = edge_tts.Communicate(text, voice, rate="+4%", volume="+0%")
+            await communicate.save(path)
+
+        fd, filename = tempfile.mkstemp(suffix=".mp3", prefix="jarvis_voice_")
+        os.close(fd)
+        try:
+            asyncio.run(synthesize(filename))
+            if not pygame.mixer.get_init():
+                pygame.mixer.init()
+            pygame.mixer.music.load(filename)
+            pygame.mixer.music.play()
+            while pygame.mixer.music.get_busy():
+                time.sleep(0.08)
+            pygame.mixer.music.unload()
+        finally:
+            try:
+                Path(filename).unlink(missing_ok=True)
+            except OSError:
+                pass
+
     def speak(self, text: str) -> None:
         text = " ".join(str(text).split())
         if not text:
             return
-        if self.settings.tts_backend == "sapi":
-            self._sapi().Speak(text, 1)  # асинхронно, UI не блокируется
+        if self.settings.tts_backend == "edge":
+            self._edge(text)
+        elif self.settings.tts_backend == "sapi":
+            self._sapi().Speak(text, 0)
         else:
             raise RuntimeError(f"Неизвестный TTS backend: {self.settings.tts_backend}")

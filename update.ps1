@@ -9,6 +9,7 @@ $files = @(
     'jarvis/brain.py',
     'jarvis/app.py',
     'jarvis/config.py',
+    'jarvis/asr.py',
     'jarvis/pc_control.py'
 )
 $stagedFiles = @()

@@ -283,7 +283,7 @@ def handle_command(user_text: str, previous_user_text: str = "") -> str | None:
 
     # Закрытие разрешено только для приложений из белого списка.
     close_match = re.match(
-        r"^(?:закрой|закрывай|заверши|останови)(?:\\s+(.+))?$", text
+        r"^(?:закрой|закрывай|заверши|останови)(?:\s+(.+))?$", text
     )
     if close_match:
         target_to_close = (close_match.group(1) or "").strip()
@@ -291,7 +291,7 @@ def handle_command(user_text: str, previous_user_text: str = "") -> str | None:
             prior = _normalize(previous_user_text)
             prior_open = re.match(
                 r"^(?:открой(?:те)?|открою|открывай(?:те)?|запусти(?:те)?|"
-                r"запускай(?:те)?|включи(?:те)?|включай(?:те)?|покажи)\\s+(.+)$",
+                r"запускай(?:те)?|включи(?:те)?|включай(?:те)?|покажи)\s+(.+)$",
                 prior,
             )
             target_to_close = prior_open.group(1).strip() if prior_open else ""

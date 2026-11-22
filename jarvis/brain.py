@@ -178,7 +178,7 @@ class JarvisBrain:
             return command_answer
 
         base = (self.settings.llm_base_url or "http://localhost:11434").rstrip("/")
-        model = (self.settings.llm_model or "qwen2.5:3b").strip()
+        model = (self.settings.llm_model or "qwen3.5:9b").strip()
         messages = [{"role": "system", "content": SYSTEM_PROMPT}]
         memory_text = self._memory_context()
         if memory_text:
@@ -190,8 +190,8 @@ class JarvisBrain:
         messages.extend(self._context_messages())
         messages.append({"role": "user", "content": clean_text})
         payload = {
-            "model": model, "messages": messages, "stream": False, "keep_alive": "2h",
-            "options": {"temperature": 0.35, "num_predict": 220, "num_ctx": 4096,
+            "model": model, "messages": messages, "stream": False, "think": False, "keep_alive": "2h",
+            "options": {"temperature": 0.35, "num_predict": 1200, "num_ctx": 4096,
                         "repeat_penalty": 1.08},
         }
         request = urllib.request.Request(
@@ -206,7 +206,7 @@ class JarvisBrain:
             reason = getattr(exc, "reason", exc)
             raise RuntimeError(
                 "Не удалось подключиться к локальному ИИ. Проверь, что Ollama запущена "
-                "и модель qwen2.5:3b установлена. "
+                 "и модель qwen3.5:9b установлена. "
                 f"Подробности: {reason}"
             ) from exc
         answer = ((data.get("message") or {}).get("content") or "").strip()

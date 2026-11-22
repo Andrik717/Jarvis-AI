@@ -74,8 +74,8 @@ try {
             $createdTargets.Add($target)
         }
 
-        Copy-Item -LiteralPath $source -Destination $target -Force
         $installedTargets.Add($target)
+        Copy-Item -LiteralPath $source -Destination $target -Force
         Write-Host "Installed: $relative"
     }
 
@@ -95,7 +95,9 @@ catch {
     Write-Host ('UPDATE FAILED: ' + $_.Exception.Message) -ForegroundColor Red
     Write-Host 'Restoring files changed by this update...' -ForegroundColor Yellow
 
-    foreach ($target in @($installedTargets.ToArray()) | Select-Object -Reverse) {
+    $restoreTargets = @($installedTargets.ToArray())
+    [array]::Reverse($restoreTargets)
+    foreach ($target in $restoreTargets) {
         $backup = $target + '.bak'
         if (Test-Path -LiteralPath $backup) {
             Copy-Item -LiteralPath $backup -Destination $target -Force

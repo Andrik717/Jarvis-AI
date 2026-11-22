@@ -432,11 +432,17 @@ class JarvisWindow:
         threading.Thread(target=self._text_worker, args=(question,), daemon=True).start()
         return "break"
 
+    def _process_request(self, question: str) -> str:
+        """Единый маршрут: команда или локальный ИИ; оба результата входят в контекст."""
+        answer = handle_command(question)
+        if answer is not None:
+            self.brain.record_exchange(question, answer)
+            return answer
+        return self.brain.reply(question)
+
     def _text_worker(self, question: str):
         try:
-            answer = handle_command(question)
-            if answer is None:
-                answer = self.brain.reply(question)
+            answer = self._process_request(question)
             self._ui(self._append, "ДЖАРВИС: " + answer)
             self._ui(self._set_last_answer, answer)
             self._ui(self.status.set, "ГОТОВ. МОЖЕТЕ НАПИСАТЬ СЛЕДУЮЩИЙ ВОПРОС.")
@@ -455,9 +461,7 @@ class JarvisWindow:
                 return
             self._ui(self._append, "ВЫ: " + recognized)
             self._ui(self.status.set, "ДУМАЮ…")
-            answer = handle_command(recognized)
-            if answer is None:
-                answer = self.brain.reply(recognized)
+            answer = self._process_request(recognized)
             self._ui(self._append, "ДЖАРВИС: " + answer)
             self._ui(self._set_last_answer, answer)
             self._ui(self.status.set, "ОТВЕЧАЮ ГОЛОСОМ…")

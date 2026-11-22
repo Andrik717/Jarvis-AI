@@ -18,3 +18,14 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Compile application modules
         run: python -m compileall -q jarvis
+
+  updater-powershell:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate updater PowerShell syntax
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          [scriptblock]::Create((Get-Content -LiteralPath 'update.ps1' -Raw)) | Out-Null
+          Write-Host 'update.ps1 PowerShell syntax is valid.'

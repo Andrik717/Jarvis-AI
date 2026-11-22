@@ -536,7 +536,9 @@ class JarvisWindow:
     def _listen_worker(self, audio):
         try:
             self._ui(self.status.set, "РАСПОЗНАЮ РЕЧЬ…")
-            recognized = self.asr.transcribe(audio)
+            recognized = self.asr.transcribe(
+                audio, context=self.brain.transcription_context()
+            )
             if not recognized:
                 self._ui(self.status.set, "РЕЧЬ НЕ РАСПОЗНАНА. ПОПРОБУЙТЕ ЕЩЁ РАЗ.")
                 return

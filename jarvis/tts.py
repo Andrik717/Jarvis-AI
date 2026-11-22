@@ -53,7 +53,6 @@ class SpeechOutput:
         import pygame
 
         voice = "ru-RU-DmitryNeural"
-        self._stop_event.clear()
         fd, filename = tempfile.mkstemp(suffix=".mp3", prefix="jarvis_dmitry_")
         os.close(fd)
         try:
@@ -87,6 +86,10 @@ class SpeechOutput:
             except Exception:
                 pass
             Path(filename).unlink(missing_ok=True)
+
+    def reset_stop(self) -> None:
+        """Сбрасывает флаг перед запуском новой задачи озвучки."""
+        self._stop_event.clear()
 
     def stop(self) -> None:
         """Останавливает текущую озвучку; безопасен и до начала воспроизведения."""

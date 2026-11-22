@@ -61,11 +61,8 @@ try {
     if (-not (Select-String -LiteralPath $stagedTts -Pattern "ru-RU-DmitryNeural" -Quiet)) {
         throw "Downloaded TTS file is missing the Dmitry voice setting."
     }
-    if (-not (Select-String -LiteralPath $stagedTts -SimpleMatch -Pattern "def _sapi(" -Quiet)) {
-        throw "Downloaded TTS file is missing the Windows speech fallback."
-    }
-    if (-not (Select-String -LiteralPath $stagedTts -SimpleMatch -Pattern "self._sapi().Speak(text, 0)" -Quiet)) {
-        throw "Downloaded TTS file does not route Edge failures to the Windows speech fallback."
+    if (Select-String -LiteralPath $stagedTts -Pattern "SAPI|_sapi|SpVoice|last_fallback_error" -Quiet) {
+        throw "Downloaded TTS file still contains a Windows speech fallback."
     }
 
     $stagedBrain = Join-Path $stage "jarvis\brain.py"

@@ -90,6 +90,8 @@ def _search_web(query: str) -> str:
 
 def _normalize(value: str) -> str:
     text = str(value or "").casefold().replace("ё", "е")
+    # Вежливые слова не должны мешать извлечению названия команды.
+    text = re.sub(r"\bпожалуйста\b", " ", text)
     text = re.sub(r"[^а-яa-z0-9 ]+", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
     return re.sub(r"^(?:эй )?джарвис[ ,]*", "", text).strip()
@@ -212,7 +214,7 @@ def _weather_for_city(city: str) -> str:
         return f"Не удалось получить актуальную погоду для {city}: {str(exc)[:100]}. Проверь подключение к интернету."
 
 
-def handle_command(user_text: str) -> str | None:
+def handle_command(user_text: str, previous_user_text: str = "") -> str | None:
     """Выполняет только заранее разрешённые команды, иначе отдаёт фразу ИИ."""
     text = _normalize(user_text)
     if not text:
@@ -260,7 +262,7 @@ def handle_command(user_text: str) -> str | None:
         "почту": ("почту", "https://mail.google.com"),
         "почта": ("почту", "https://mail.google.com"),
     }
-    site_match = re.match(r"^(?:открой(?:те)?|открою|открывай(?:те)?|запусти(?:те)?|запускай(?:те)?|включи(?:те)?|включай(?:те)?|перейди на|перейдите на)\s+(?:сайт\s+)?(.+)$", text)
+    site_match = re.match(r"^(?:(?:можешь|можете|не мог бы ты|не могли бы вы)\s+)?(?:открой(?:те)?|открою|открывай(?:те)?|открыть|запусти(?:те)?|запускай(?:те)?|запустить|включи(?:те)?|включай(?:те)?|включить|перейди на|перейдите на)(?:\s+мне)?(?:\s+пожалуйста)?\s+(?:сайт\s+)?(.+)$", text)
     if site_match:
         target = site_match.group(1).strip()
         if target in websites:
@@ -271,21 +273,61 @@ def handle_command(user_text: str) -> str | None:
             except OSError as exc:
                 return f"Не удалось открыть {name}. Причина: {exc}"
 
-    # Программы Windows.
+    # Программы Windows. Команды запуска и закрытия ограничены белым списком.
     apps = {
-        "блокнот": (("блокнот", "notepad"), ["notepad.exe"]),
-        "калькулятор": (("калькулятор", "кальк"), ["calc.exe"]),
-        "проводник": (("проводник", "папки"), ["explorer.exe", str(Path.home())]),
-        "диспетчер задач": (("диспетчер задач", "диспетчер"), ["taskmgr.exe"]),
-        "paint": (("paint", "пейнт", "рисование"), ["mspaint.exe"]),
-        "ножницы": (("ножницы", "снимок экрана"), ["SnippingTool.exe"]),
+        "блокнот": (("блокнот", "notepad"), ["notepad.exe"], "notepad.exe"),
+        "калькулятор": (("калькулятор", "кальк"), ["calc.exe"], "CalculatorApp.exe"),
+        "проводник": (("проводник", "папки"), None, None),
+        "диспетчер задач": (("диспетчер задач", "диспетчер"), ["taskmgr.exe"], "Taskmgr.exe"),
+        "paint": (("paint", "пейнт", "рисование"), ["mspaint.exe"], "mspaint.exe"),
+        "ножницы": (("ножницы", "снимок экрана"), ["SnippingTool.exe"], "SnippingTool.exe"),
     }
-    app_match = re.match(r"^(?:открой(?:те)?|открою|открывай(?:те)?|запусти(?:те)?|запускай(?:те)?|включи(?:те)?|включай(?:те)?|покажи)\s+(.+)$", text)
+
+    # Закрытие разрешено только для приложений из белого списка.
+    close_match = re.match(
+        r"^(?:закрой|закрывай|заверши|останови)(?:\s+(.+))?$", text
+    )
+    if close_match:
+        target_to_close = (close_match.group(1) or "").strip()
+        if target_to_close in ("его", "ее", "это", "приложение", ""):
+            prior = _normalize(previous_user_text)
+            prior_open = re.match(
+                r"^(?:(?:можешь|можете|не мог бы ты|не могли бы вы)\s+)?"
+                r"(?:открой(?:те)?|открою|открывай(?:те)?|открыть|запусти(?:те)?|"
+                r"запускай(?:те)?|запустить|включи(?:те)?|включай(?:те)?|включить|покажи)"
+                r"(?:\s+мне)?(?:\s+пожалуйста)?\s+(.+)$",
+                prior,
+            )
+            target_to_close = prior_open.group(1).strip() if prior_open else ""
+        for display, (aliases, _command, process_name) in apps.items():
+            if process_name and (
+                target_to_close in aliases
+                or _is_close_alias(target_to_close, aliases)
+            ):
+                if os.name != "nt":
+                    return "Закрытие приложений доступно только в Windows."
+                result = subprocess.run(
+                    ["taskkill.exe", "/IM", process_name, "/T", "/F"],
+                    capture_output=True, text=True, check=False,
+                )
+                if result.returncode == 0:
+                    return f"Закрыл приложение «{display}»."
+                detail = (result.stderr or result.stdout or "").strip()
+                if "not found" in detail.casefold() or "не найден" in detail.casefold():
+                    return f"Приложение «{display}» уже закрыто."
+                return f"Не удалось закрыть «{display}». {detail[:180]}"
+        if target_to_close:
+            return "Пока могу закрывать только поддерживаемые приложения: Блокнот, Калькулятор, Paint, Ножницы и Диспетчер задач."
+        return "Не понял, какое приложение закрыть. Назови его, например: «закрой блокнот»."
+
+    app_match = re.match(r"^(?:(?:можешь|можете|не мог бы ты|не могли бы вы)\s+)?(?:открой(?:те)?|открою|открывай(?:те)?|открыть|запусти(?:те)?|запускай(?:те)?|запустить|включи(?:те)?|включай(?:те)?|включить|покажи)(?:\s+мне)?(?:\s+пожалуйста)?\s+(.+)$", text)
     if app_match:
         target = app_match.group(1).strip()
-        for display, (aliases, command) in apps.items():
+        for display, (aliases, command, _process_name) in apps.items():
             if target in aliases or _is_close_alias(target, aliases):
                 try:
+                    if command is None:
+                        command = ["explorer.exe", str(Path.home())]
                     subprocess.Popen(command)
                     return f"Открываю {display}."
                 except OSError as exc:

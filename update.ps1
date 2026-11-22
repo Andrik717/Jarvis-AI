@@ -71,9 +71,26 @@ try {
         throw 'Downloaded app.py is missing contextual follow-up handling.'
     }
 
+    $stagedAsr = Join-Path $stage 'jarvis\asr.py'
+    if (-not (Select-String -LiteralPath $stagedAsr -Pattern 'def transcribe\(self, audio: np.ndarray, context: str = ""\)' -Quiet)) {
+        throw 'Downloaded asr.py is missing contextual local speech recognition.'
+    }
+
+    if (-not (Select-String -LiteralPath $stagedBrain -Pattern 'def transcription_context\(' -Quiet)) {
+        throw 'Downloaded brain.py is missing the speech context provider.'
+    }
+
+    if (-not (Select-String -LiteralPath $stagedApp -Pattern 'context=self.brain.transcription_context' -Quiet)) {
+        throw 'Downloaded app.py is not passing dialogue context to speech recognition.'
+    }
+
     $stagedPcControl = Join-Path $stage 'jarvis\pc_control.py'
     if (-not (Select-String -LiteralPath $stagedPcControl -Pattern 'def _search_web\(' -Quiet)) {
         throw 'Downloaded pc_control.py is missing in-chat web search.'
+    }
+
+    if (-not (Select-String -LiteralPath $stagedPcControl -Pattern 'def _is_close_alias\(' -Quiet)) {
+        throw 'Downloaded pc_control.py is missing safe typo matching for known commands.'
     }
 
     Write-Host 'Checking downloaded Python files...'

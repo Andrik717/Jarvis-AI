@@ -64,11 +64,27 @@ class SpeechOutput:
                 )
                 await communicate.save(filename)
 
-            # Возвращаем цельную генерацию: именно этот вариант раньше
-            # давал пользователю подтверждённый мужской голос.
-            asyncio.run(synthesize())
-            if not os.path.exists(filename) or os.path.getsize(filename) < 256:
-                raise RuntimeError("Edge TTS не создал аудио для ru-RU-DmitryNeural")
+            # Edge TTS иногда закрывает соединение без аудио. Повторяем
+            # запрос, не меняя закреплённый мужской голос Дмитрия.
+            last_error = None
+            for attempt in range(3):
+                try:
+                    Path(filename).unlink(missing_ok=True)
+                    asyncio.run(synthesize())
+                    if not os.path.exists(filename) or os.path.getsize(filename) < 256:
+                        raise RuntimeError("Edge TTS не создал аудио для ru-RU-DmitryNeural")
+                    last_error = None
+                    break
+                except Exception as exc:
+                    last_error = exc
+                    Path(filename).unlink(missing_ok=True)
+                    if attempt < 2:
+                        time.sleep(0.8 * (attempt + 1))
+            if last_error is not None:
+                raise RuntimeError(
+                    "Не удалось получить аудио от Edge TTS после 3 попыток: "
+                    + str(last_error)
+                ) from last_error
             if self._stop_event.is_set():
                 return
 

@@ -532,7 +532,7 @@ class JarvisWindow:
 
         def save():
             self.settings.llm_base_url = entries["url"].get().strip() or "http://localhost:11434"
-            self.settings.llm_model = entries["model"].get().strip() or "qwen2.5:3b"
+            self.settings.llm_model = entries["model"].get().strip() or "qwen3.5:9b"
             self.settings.tts_voice = entries["voice"].get().strip() or "ru-RU-DmitryNeural"
             self.settings.tts_backend = "edge"
             save_settings(self.settings)

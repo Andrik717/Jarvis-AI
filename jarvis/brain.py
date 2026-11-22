@@ -83,6 +83,16 @@ def _needs_deep_reasoning(text: str) -> bool:
     )
     return any(marker in lowered for marker in markers)
 
+
+def _is_model_question(text: str) -> bool:
+    """Распознаёт вопросы о выбранной модели локального ИИ."""
+    return bool(re.search(
+        r"(?:какая|какую|что за)\\s+(?:у тебя\\s+)?модел|"
+        r"какую\\s+модель\\s+(?:ты\\s+)?использу|"
+        r"на какой\\s+модели",
+        _clean(text).casefold(),
+    ))
+
 class JarvisBrain:
     def __init__(self, settings):
         self.settings = settings
@@ -200,13 +210,7 @@ class JarvisBrain:
 
         # Отвечаем о модели по реальной настройке приложения, а не просим LLM
         # угадывать собственную конфигурацию.
-        model_question = re.search(
-            r"(?:какая|какую|что за)\s+(?:у тебя\s+)?модел|"
-            r"какую\s+модель\s+(?:ты\s+)?использу|"
-            r"на какой\s+модели",
-            clean_text.casefold(),
-        )
-        if model_question:
+        if _is_model_question(clean_text):
             model_name = (self.settings.llm_model or "не указана").strip()
             answer = f"Сейчас в настройках Джарвиса выбрана модель {model_name}. "
             answer += "Она работает локально через Ollama."

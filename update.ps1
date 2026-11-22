@@ -153,7 +153,7 @@ try {
         Write-Host "Edge TTS direct test passed." -ForegroundColor Green
     }
     else {
-        Write-Host "WARNING: Edge TTS direct test failed (exit $ttsDiagnosticExit). The report above identifies the local failure; Windows fallback remains available." -ForegroundColor Yellow
+        Write-Host "WARNING: Edge TTS direct test failed (exit $ttsDiagnosticExit). The report above identifies the local failure; speech will remain silent until Edge TTS is available." -ForegroundColor Yellow
     }
 
     $success = $true

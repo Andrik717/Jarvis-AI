@@ -3,7 +3,7 @@ import unittest
 from unittest.mock import patch
 
 from jarvis.brain import _clean, _is_model_question, _needs_deep_reasoning
-from jarvis.pc_control import _normalize, handle_command
+from jarvis.pc_control import _DuckDuckGoParser, _normalize, handle_command
 
 
 class DialogueTests(unittest.TestCase):
@@ -21,6 +21,18 @@ class DialogueTests(unittest.TestCase):
 
     def test_normalization_handles_yo_and_assistant_name(self):
         self.assertEqual(_normalize("Эй, Джарвис! Открой Ёлки"), "открой елки")
+
+
+class WebSearchParserTests(unittest.TestCase):
+    def test_extracts_search_title_and_snippet(self):
+        parser = _DuckDuckGoParser()
+        parser.feed(
+            '<a class="result__a" href="https://example.com">Example result</a>'
+            '<div class="result__snippet">Useful summary text</div>'
+        )
+        self.assertEqual(parser.results[0]["title"], "Example result")
+        self.assertEqual(parser.results[0]["snippet"], "Useful summary text")
+        self.assertEqual(parser.results[0]["url"], "https://example.com")
 
 
 class SafeCommandTests(unittest.TestCase):

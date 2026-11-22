@@ -277,7 +277,7 @@ def handle_command(user_text: str, previous_user_text: str = "") -> str | None:
     apps = {
         "блокнот": (("блокнот", "notepad"), ["notepad.exe"], "notepad.exe"),
         "калькулятор": (("калькулятор", "кальк"), ["calc.exe"], "CalculatorApp.exe"),
-        "проводник": (("проводник", "папки"), ["explorer.exe", str(Path.home())], None),
+        "проводник": (("проводник", "папки"), None, None),
         "диспетчер задач": (("диспетчер задач", "диспетчер"), ["taskmgr.exe"], "Taskmgr.exe"),
         "paint": (("paint", "пейнт", "рисование"), ["mspaint.exe"], "mspaint.exe"),
         "ножницы": (("ножницы", "снимок экрана"), ["SnippingTool.exe"], "SnippingTool.exe"),
@@ -326,6 +326,8 @@ def handle_command(user_text: str, previous_user_text: str = "") -> str | None:
         for display, (aliases, command, _process_name) in apps.items():
             if target in aliases or _is_close_alias(target, aliases):
                 try:
+                    if command is None:
+                        command = ["explorer.exe", str(Path.home())]
                     subprocess.Popen(command)
                     return f"Открываю {display}."
                 except OSError as exc:

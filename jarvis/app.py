@@ -196,6 +196,17 @@ class JarvisWindow:
         except tk.TclError:
             pass
 
+    def _reset_tts_stop(self):
+        """Совместимость с установленной версией TTS при частичном обновлении."""
+        reset = getattr(self.tts, "reset_stop", None)
+        if callable(reset):
+            reset()
+            return
+        stop_event = getattr(self.tts, "_stop_event", None)
+        clear = getattr(stop_event, "clear", None)
+        if callable(clear):
+            clear()
+
     def stop_speaking(self):
         """Прерывает только текущую/ожидающую озвучку, не отменяя вычисление ответа."""
         self._speech_cancelled.set()
@@ -450,7 +461,7 @@ class JarvisWindow:
                 )
                 return
             self._speech_cancelled.clear()
-            self.tts.reset_stop()
+            self._reset_tts_stop()
             self._set_busy(True, "ОТПРАВЛЯЮ ЗАПИСЬ НА РАСПОЗНАВАНИЕ…")
             threading.Thread(
                 target=self._listen_worker, args=(audio,), daemon=True

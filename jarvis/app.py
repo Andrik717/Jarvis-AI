@@ -35,64 +35,57 @@ class JarvisWindow:
         self.last_answer = ""
 
         self.root = tk.Tk()
-        self.root.title("JARVIS AI — голосовой помощник")
-        self.root.geometry("940x720")
-        self.root.minsize(760, 600)
+        self.root.title("JARVIS AI — персональный ИИ-помощник")
+        self.root.geometry("1180x820")
+        self.root.minsize(900, 680)
         self.root.configure(bg=BG)
         self.root.protocol("WM_DELETE_WINDOW", self.root.destroy)
         self._build()
 
     def _build(self):
         header = tk.Frame(self.root, bg=BG)
-        header.pack(fill="x", padx=28, pady=(18, 8))
-        tk.Label(header, text="J.A.R.V.I.S.", bg=BG, fg=CYAN,
-                 font=("Segoe UI", 28, "bold")).pack()
-        tk.Label(header, text="ГОЛОСОВОЙ ИИ-ПОМОЩНИК",
-                 bg=BG, fg=MUTED, font=("Segoe UI", 10, "bold")).pack(pady=(2, 0))
-        self.core = tk.Canvas(header, width=210, height=94, bg=BG,
-                              highlightthickness=0, bd=0)
-        self.core.pack(pady=(5, 0))
+        header.pack(fill="x", padx=24, pady=(18, 14))
+        brand = tk.Frame(header, bg=BG)
+        brand.pack(side="left", anchor="w")
+        tk.Label(brand, text="J.A.R.V.I.S.", bg=BG, fg=CYAN, font=("Segoe UI", 25, "bold")).pack(anchor="w")
+        tk.Label(brand, text="ПЕРСОНАЛЬНЫЙ ИИ-ПОМОЩНИК", bg=BG, fg=MUTED, font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(1, 0))
+        status_panel = tk.Frame(header, bg=PANEL, highlightthickness=1, highlightbackground="#1b3a49")
+        status_panel.pack(side="right", anchor="e", padx=(12, 0))
+        self.status = tk.StringVar(value="ГОТОВ К РАБОТЕ")
+        tk.Label(status_panel, textvariable=self.status, bg=PANEL, fg=CYAN, font=("Segoe UI", 9, "bold"), padx=16, pady=11).pack()
+
+        workspace = tk.Frame(self.root, bg=BG)
+        workspace.pack(fill="both", expand=True, padx=24, pady=(0, 12))
+        voice_panel = tk.Frame(workspace, bg=PANEL, width=270, highlightthickness=1, highlightbackground="#173747")
+        voice_panel.pack(side="left", fill="y", padx=(0, 14))
+        voice_panel.pack_propagate(False)
+        tk.Label(voice_panel, text="ГОЛОСОВОЕ УПРАВЛЕНИЕ", bg=PANEL, fg=CYAN, font=("Segoe UI", 10, "bold")).pack(anchor="w", padx=18, pady=(18, 4))
+        tk.Label(voice_panel, text="Скажите, что нужно сделать", bg=PANEL, fg=MUTED, font=("Segoe UI", 9)).pack(anchor="w", padx=18)
+        self.core = tk.Canvas(voice_panel, width=230, height=190, bg=PANEL, highlightthickness=0, bd=0)
+        self.core.pack(pady=(12, 10))
         self._core_phase = 0
         self._animate_core()
+        self.listen_button = tk.Button(voice_panel, text="🎙  НАЧАТЬ ГОВОРИТЬ", command=self.listen, font=("Segoe UI", 11, "bold"), bg=GREEN, fg="#ffffff", activebackground="#1b5962", activeforeground="#ffffff", disabledforeground="#a7bec4", relief="flat", bd=0, cursor="hand2", padx=12, pady=15, wraplength=220)
+        self.listen_button.pack(fill="x", padx=16, pady=(4, 8))
+        self.stop_button = tk.Button(voice_panel, text="■  ОСТАНОВИТЬ ОЗВУЧКУ", command=self.stop_speaking, font=("Segoe UI", 9, "bold"), bg="#542b37", fg="#ffffff", activebackground="#793747", activeforeground="#ffffff", relief="flat", bd=0, cursor="hand2", padx=10, pady=12, state="disabled")
+        self.stop_button.pack(fill="x", padx=16, pady=(0, 14))
+        tk.Frame(voice_panel, bg="#203b49", height=1).pack(fill="x", padx=16, pady=5)
+        tk.Label(voice_panel, text="КАК ЭТО РАБОТАЕТ", bg=PANEL, fg=CYAN, font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=18, pady=(8, 5))
+        tk.Label(voice_panel, text="1. Нажмите кнопку микрофона.\n2. Скажите свою команду.\n3. Нажмите отправку — Джарвис ответит голосом.", bg=PANEL, fg=MUTED, font=("Segoe UI", 9), justify="left", wraplength=225).pack(anchor="w", padx=18, pady=(0, 12))
 
-        status_panel = tk.Frame(self.root, bg=PANEL, highlightthickness=1,
-                                highlightbackground="#173747")
-        status_panel.pack(fill="x", padx=28, pady=(12, 10))
-        self.status = tk.StringVar(value="ГОТОВ К РАБОТЕ")
-        tk.Label(status_panel, textvariable=self.status, bg=PANEL, fg=CYAN,
-                 font=("Segoe UI", 11, "bold"), pady=10).pack()
-
-        voice_row = tk.Frame(self.root, bg=BG)
-        voice_row.pack(fill="x", padx=28, pady=(4, 8))
-        self.listen_button = tk.Button(
-            voice_row, text="🎙   НАЖМИТЕ, ЧТОБЫ ГОВОРИТЬ", command=self.listen,
-            font=("Segoe UI", 16, "bold"), bg=GREEN, fg="#ffffff",
-            activebackground="#1b5962", activeforeground="#ffffff",
-            disabledforeground="#a7bec4", relief="flat", bd=0, cursor="hand2",
-            padx=18, pady=20)
-        self.listen_button.pack(side="left", fill="x", expand=True)
-        self.stop_button = tk.Button(
-            voice_row, text="■  СТОП", command=self.stop_speaking,
-            font=("Segoe UI", 12, "bold"), bg="#642b36", fg="#ffffff",
-            activebackground="#8b3545", activeforeground="#ffffff",
-            relief="flat", bd=0, cursor="hand2", padx=22, pady=20,
-            state="disabled")
-        self.stop_button.pack(side="right", padx=(10, 0))
-
-        tk.Label(self.root,
-                 text="Говорите после нажатия. Джарвис распознает фразу, ответит и произнесёт ответ.",
-                 bg=BG, fg=MUTED, font=("Segoe UI", 9)).pack(pady=(0, 8))
-
-        log_frame = tk.Frame(self.root, bg=PANEL)
-        log_frame.pack(fill="both", expand=True, padx=28, pady=8)
-        tk.Label(log_frame, text="ИСТОРИЯ ДИАЛОГА", bg=PANEL, fg=CYAN,
-                 font=("Segoe UI", 9, "bold"), anchor="w").pack(fill="x", padx=14, pady=(10, 4))
-        self.log = tk.Text(log_frame, bg=PANEL, fg=TEXT, insertbackground=TEXT,
-                           selectbackground="#24515d", relief="flat", wrap="word",
-                           font=("Segoe UI", 11), padx=14, pady=8, height=9, borderwidth=0)
-        self.log.pack(fill="both", expand=True, padx=4, pady=(0, 8))
-        # Слушаем все нажатия: на Windows Tk по-разному описывает Ctrl+C
-        # в зависимости от активной раскладки клавиатуры.
+        chat_panel = tk.Frame(workspace, bg=PANEL, highlightthickness=1, highlightbackground="#173747")
+        chat_panel.pack(side="left", fill="both", expand=True)
+        chat_header = tk.Frame(chat_panel, bg=PANEL)
+        chat_header.pack(fill="x", padx=18, pady=(16, 8))
+        tk.Label(chat_header, text="ДИАЛОГ", bg=PANEL, fg=TEXT, font=("Segoe UI", 13, "bold")).pack(side="left")
+        tk.Label(chat_header, text="История общения с Джарвисом", bg=PANEL, fg=MUTED, font=("Segoe UI", 9)).pack(side="right")
+        history_frame = tk.Frame(chat_panel, bg=PANEL)
+        history_frame.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+        scrollbar = tk.Scrollbar(history_frame, orient="vertical")
+        scrollbar.pack(side="right", fill="y")
+        self.log = tk.Text(history_frame, bg="#0a1a25", fg=TEXT, insertbackground=TEXT, selectbackground="#24515d", relief="flat", wrap="word", font=("Segoe UI", 10), padx=16, pady=14, height=10, borderwidth=0, yscrollcommand=scrollbar.set, spacing1=3, spacing3=7)
+        self.log.pack(side="left", fill="both", expand=True)
+        scrollbar.configure(command=self.log.yview)
         self.root.bind_all("<KeyPress>", self._copy_on_ctrl_key, add="+")
         self.root.bind_all("<Control-Insert>", self._copy_selection, add="+")
         self.log.bind("<Control-Insert>", self._copy_selection, add="+")
@@ -104,29 +97,30 @@ class JarvisWindow:
         self.log.bind("<Control-a>", self._select_all)
         self.log.bind("<Control-A>", self._select_all)
 
-        # Отдельный текстовый ввод: микрофон запускается только кнопкой выше.
-        text_frame = tk.Frame(self.root, bg=PANEL, highlightthickness=1,
-                              highlightbackground="#173747")
-        text_frame.pack(fill="x", padx=28, pady=(0, 8))
-        tk.Label(text_frame, text="ТЕКСТОВАЯ КОНСОЛЬ — НАПИШИТЕ ДЖАРВИСУ",
-                 bg=PANEL, fg=CYAN, font=("Segoe UI", 9, "bold"),
-                 anchor="w").pack(fill="x", padx=12, pady=(8, 4))
-        input_row = tk.Frame(text_frame, bg=PANEL)
-        input_row.pack(fill="x", padx=10, pady=(0, 10))
-        self.text_input = tk.Entry(
-            input_row, bg="#102a38", fg=TEXT, insertbackground=TEXT,
-            relief="flat", font=("Segoe UI", 11),
-        )
-        self.text_input.pack(side="left", fill="x", expand=True, ipady=10, padx=(0, 8))
+        composer = tk.Frame(self.root, bg=PANEL, highlightthickness=1, highlightbackground="#173747")
+        composer.pack(fill="x", padx=24, pady=(0, 10))
+        tk.Label(composer, text="СООБЩЕНИЕ ДЖАРВИСУ", bg=PANEL, fg=CYAN, font=("Segoe UI", 8, "bold")).pack(anchor="w", padx=14, pady=(9, 3))
+        input_row = tk.Frame(composer, bg=PANEL)
+        input_row.pack(fill="x", padx=12, pady=(0, 12))
+        self.text_input = tk.Entry(input_row, bg="#102a38", fg=TEXT, insertbackground=TEXT, relief="flat", font=("Segoe UI", 11))
+        self.text_input.pack(side="left", fill="x", expand=True, ipady=11, padx=(0, 9))
         self.text_input.bind("<Return>", self.send_text)
-        self.send_button = tk.Button(
-            input_row, text="ОТПРАВИТЬ", command=self.send_text,
-            font=("Segoe UI", 9, "bold"), bg=GREEN, fg="#ffffff",
-            activebackground="#1b5962", activeforeground="#ffffff",
-            disabledforeground="#a7bec4", relief="flat", bd=0,
-            cursor="hand2", padx=18, pady=10,
-        )
+        self.send_button = tk.Button(input_row, text="ОТПРАВИТЬ  ➤", command=self.send_text, font=("Segoe UI", 9, "bold"), bg=GREEN, fg="#ffffff", activebackground="#1b5962", activeforeground="#ffffff", disabledforeground="#a7bec4", relief="flat", bd=0, cursor="hand2", padx=18, pady=11)
         self.send_button.pack(side="right")
+
+        actions = tk.Frame(self.root, bg=BG)
+        actions.pack(fill="x", padx=24, pady=(0, 16))
+        def action(label, command, danger=False):
+            return tk.Button(actions, text=label, command=command, font=("Segoe UI", 8, "bold"), bg="#18313f" if not danger else "#492a32", fg=TEXT, activebackground="#25495a", activeforeground=TEXT, relief="flat", bd=0, cursor="hand2", padx=11, pady=9)
+        self.voice_button = action("ПРОВЕРИТЬ ГОЛОС", self.test_voice)
+        self.voice_button.pack(side="left")
+        action("КОПИРОВАТЬ ОТВЕТ", self._copy_last_answer).pack(side="left", padx=(7, 0))
+        action("КОПИРОВАТЬ ЧАТ", self._copy_all_dialog).pack(side="left", padx=(7, 0))
+        action("СОХРАНИТЬ TXT", self._save_dialog).pack(side="left", padx=(7, 0))
+        action("ОЧИСТИТЬ ПАМЯТЬ", self.clear_memory, danger=True).pack(side="left", padx=(7, 0))
+        action("НАСТРОЙКИ", self.open_settings).pack(side="left", padx=(7, 0))
+        action("ВЫХОД", self.root.destroy).pack(side="right")
+
         if self.brain.history:
             self._append("СИСТЕМА: Предыдущая история диалога восстановлена.")
             for item in self.brain.history[-10:]:
@@ -136,64 +130,20 @@ class JarvisWindow:
             self._append("ДЖАРВИС: Система запущена. Я готов к разговору.")
         self._append("ПОДСКАЗКА: скажите «Запомни, что…», чтобы сохранить важный факт.")
 
-        controls = tk.Frame(self.root, bg=BG)
-        controls.pack(fill="x", padx=28, pady=(8, 18))
-        self.voice_button = tk.Button(
-            controls, text="ПРОВЕРИТЬ ГОЛОС", command=self.test_voice,
-            font=("Segoe UI", 9, "bold"), bg="#18313f", fg=TEXT,
-            activebackground="#25495a", activeforeground=TEXT,
-            relief="flat", bd=0, cursor="hand2", padx=14, pady=11)
-        self.voice_button.pack(side="left")
-        tk.Button(
-            controls, text="КОПИРОВАТЬ ОТВЕТ", command=self._copy_last_answer,
-            font=("Segoe UI", 9, "bold"), bg="#18313f", fg=TEXT,
-            activebackground="#25495a", activeforeground=TEXT,
-            relief="flat", bd=0, cursor="hand2", padx=12, pady=11).pack(side="left", padx=(8, 0))
-        tk.Button(
-            controls, text="КОПИРОВАТЬ ВЕСЬ ЧАТ", command=self._copy_all_dialog,
-            font=("Segoe UI", 9, "bold"), bg="#18313f", fg=TEXT,
-            activebackground="#25495a", activeforeground=TEXT,
-            relief="flat", bd=0, cursor="hand2", padx=12, pady=11).pack(side="left", padx=(8, 0))
-        tk.Button(
-            controls, text="СОХРАНИТЬ ЧАТ TXT", command=self._save_dialog,
-            font=("Segoe UI", 9, "bold"), bg="#18313f", fg=TEXT,
-            activebackground="#25495a", activeforeground=TEXT,
-            relief="flat", bd=0, cursor="hand2", padx=12, pady=11).pack(side="left", padx=(8, 0))
-        tk.Button(
-            controls, text="ОЧИСТИТЬ ПАМЯТЬ", command=self.clear_memory,
-            font=("Segoe UI", 9, "bold"), bg="#4a2930", fg=TEXT,
-            activebackground="#66343d", activeforeground=TEXT,
-            relief="flat", bd=0, cursor="hand2", padx=14, pady=11).pack(side="left", padx=(8, 0))
-        tk.Button(
-            controls, text="НАСТРОЙКИ ИИ", command=self.open_settings,
-            font=("Segoe UI", 9, "bold"), bg="#18313f", fg=TEXT,
-            activebackground="#25495a", activeforeground=TEXT,
-            relief="flat", bd=0, cursor="hand2", padx=14, pady=11).pack(side="left", padx=8)
-        tk.Button(
-            controls, text="ВЫХОД", command=self.root.destroy,
-            font=("Segoe UI", 9, "bold"), bg="#26323a", fg=TEXT,
-            activebackground="#3a4b55", activeforeground=TEXT,
-            relief="flat", bd=0, cursor="hand2", padx=14, pady=11).pack(side="right")
-
     def _animate_core(self):
-        """Небольшая анимация ядра; работает только в главном Tk-потоке."""
+        """Плавная анимация ядра без подписи CORE ONLINE."""
         try:
             self.core.delete("pulse")
-            phase = self._core_phase % 24
+            phase = self._core_phase % 32
+            cx, cy = 115, 88
             for ring in range(3):
-                radius = 17 + ring * 12 + ((phase + ring * 5) % 12)
-                x0, y0 = 105 - radius, 45 - radius
-                x1, y1 = 105 + radius, 45 + radius
-                self.core.create_oval(x0, y0, x1, y1, outline="#1b6572",
-                                      width=1, tags="pulse")
-            self.core.create_oval(91, 31, 119, 59, fill="#123d4b",
-                                  outline=CYAN, width=2, tags="pulse")
-            self.core.create_oval(100, 40, 110, 50, fill=CYAN,
-                                  outline="", tags="pulse")
-            self.core.create_text(105, 83, text="J.A.R.V.I.S.  •  CORE ONLINE",
-                                  fill=MUTED, font=("Segoe UI", 8, "bold"), tags="pulse")
+                radius = 19 + ring * 15 + ((phase + ring * 7) % 13)
+                self.core.create_oval(cx-radius, cy-radius, cx+radius, cy+radius, outline="#1b6572", width=1, tags="pulse")
+            self.core.create_oval(cx-31, cy-31, cx+31, cy+31, fill="#102e3b", outline=CYAN, width=2, tags="pulse")
+            self.core.create_oval(cx-18, cy-18, cx+18, cy+18, fill="#164b59", outline="#3aaab5", width=1, tags="pulse")
+            self.core.create_oval(cx-6, cy-6, cx+6, cy+6, fill=CYAN, outline="", tags="pulse")
             self._core_phase += 1
-            self.root.after(90, self._animate_core)
+            self.root.after(100, self._animate_core)
         except tk.TclError:
             pass
 

@@ -14,10 +14,7 @@ class Settings:
     compute_type: str = "int8"
     beam_size: int = 5
     vad_filter: bool = True
-    tts_backend: str = "edge"
     tts_voice: str = "ru-RU-DmitryNeural"
-    sapi_rate: int = 0
-    sapi_volume: int = 100
     llm_base_url: str = "http://localhost:11434"
     llm_model: str = "qwen3.5:9b"
     # API key intentionally loaded only from environment, never serialized.
@@ -37,9 +34,6 @@ def load_settings() -> Settings:
     # Более компактная Whisper Base заметно быстрее на обычном CPU, чем Small.
     if data.get("whisper_model") == "small":
         data["whisper_model"] = "base"
-    # Миграция старых настроек: не оставляем прежний роботизированный SAPI по умолчанию.
-    if data.get("tts_backend") == "sapi":
-        data["tts_backend"] = "edge"
     # Всегда используем закреплённый мужской голос, даже если в старых настройках сохранён другой.
     data["tts_voice"] = "ru-RU-DmitryNeural"
     if not data.get("llm_base_url"):

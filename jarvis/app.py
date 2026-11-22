@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import ctypes
 import threading
+import queue
 import re
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -167,6 +168,18 @@ class JarvisWindow:
 
     def _append(self, line: str):
         self.log.insert("end", line + "\n")
+        self.log.see("end")
+
+    def _begin_stream_answer(self):
+        self.log.insert("end", "ДЖАРВИС: ")
+        self.log.see("end")
+
+    def _append_stream_piece(self, piece: str):
+        self.log.insert("end", piece)
+        self.log.see("end")
+
+    def _finish_stream_answer(self):
+        self.log.insert("end", "\n")
         self.log.see("end")
 
     def _put_clipboard(self, text: str):
@@ -441,7 +454,7 @@ class JarvisWindow:
         threading.Thread(target=self._text_worker, args=(question,), daemon=True).start()
         return "break"
 
-    def _process_request(self, question: str) -> str:
+    def _process_request(self, question: str, on_chunk=None) -> str:
         """Единый маршрут с учётом контекста предыдущей команды."""
         # Короткое уточнение города после ответа о погоде тоже является
         # командой погоды, а не отдельным вопросом к языковой модели.
@@ -479,8 +492,10 @@ class JarvisWindow:
         answer = handle_command(question, previous_user_text=previous_user_text)
         if answer is not None:
             self.brain.record_exchange(question, answer)
+            if on_chunk is not None:
+                on_chunk(answer)
             return answer
-        return self.brain.reply(question)
+        return self.brain.reply(question, on_chunk=on_chunk)
 
     def _text_worker(self, question: str):
         try:
@@ -504,23 +519,47 @@ class JarvisWindow:
                 self._ui(self.status.set, "РЕЧЬ НЕ РАСПОЗНАНА. ПОПРОБУЙТЕ ЕЩЁ РАЗ.")
                 return
             self._ui(self._append, "ВЫ: " + recognized)
-            self._ui(self.status.set, "ДУМАЮ…")
-            answer = self._process_request(recognized)
-            self._ui(self._append, "ДЖАРВИС: " + answer)
-            self._ui(self._set_last_answer, answer)
-            if not self._speech_cancelled.is_set():
-                self._ui(self.status.set, "ОТВЕЧАЮ ГОЛОСОМ…")
+            self._ui(self.status.set, "ДУМАЮ И ГОТОВЛЮ ОТВЕТ…")
+            speech_queue = queue.Queue()
+            sentinel = object()
+
+            def speech_chunks():
+                while True:
+                    item = speech_queue.get()
+                    if item is sentinel:
+                        break
+                    yield item
+
+            speech_error = []
+
+            def speak_worker():
                 try:
-                    self.tts.speak(answer)
-                except Exception as speech_exc:
-                    # Текстовый ответ уже готов: сбой TTS не должен
-                    # маскироваться под ошибку обработки всего запроса.
-                    self._ui(self._append, "ОШИБКА ОЗВУЧКИ: " + str(speech_exc))
-                    self._ui(
-                        self.status.set,
-                        "ТЕКСТОВЫЙ ОТВЕТ ГОТОВ, НО НЕ УДАЛОСЬ ВОСПРОИЗВЕСТИ ГОЛОС"
-                    )
-                    return
+                    self.tts.speak_stream(speech_chunks())
+                except Exception as exc:
+                    speech_error.append(exc)
+
+            self._ui(self._begin_stream_answer)
+            speaker = threading.Thread(target=speak_worker, daemon=True)
+            if not self._speech_cancelled.is_set():
+                speaker.start()
+
+            def on_chunk(piece):
+                self._ui(self._append_stream_piece, piece)
+                if not self._speech_cancelled.is_set():
+                    speech_queue.put(piece)
+
+            try:
+                answer = self._process_request(recognized, on_chunk=on_chunk)
+            finally:
+                speech_queue.put(sentinel)
+                self._ui(self._finish_stream_answer)
+            self._ui(self._set_last_answer, answer)
+            if speaker.is_alive():
+                speaker.join()
+            if speech_error and not self._speech_cancelled.is_set():
+                self._ui(self._append, "ОШИБКА ОЗВУЧКИ: " + str(speech_error[0]))
+                self._ui(self.status.set, "ТЕКСТ ГОТОВ, НО НЕ УДАЛОСЬ ВОСПРОИЗВЕСТИ ГОЛОС")
+                return
             self._ui(self.status.set, "ГОТОВ. МОЖЕТЕ ГОВОРИТЬ ЕЩЁ РАЗ.")
         except Exception as exc:
             self._ui(self._append, "ОШИБКА: " + str(exc))

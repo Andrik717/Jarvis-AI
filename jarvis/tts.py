@@ -121,3 +121,28 @@ class SpeechOutput:
         text = _speech_text(text)
         if text:
             self._edge(text)
+
+    def speak_stream(self, chunks) -> None:
+        """Озвучивает фразы по мере поступления текста от языковой модели."""
+        buffer = ""
+        for piece in chunks:
+            if self._stop_event.is_set():
+                return
+            buffer += str(piece or "")
+            while True:
+                match = re.search(r"[.!?…;:]\s+|\n+", buffer)
+                if match and match.end() >= 24:
+                    phrase, buffer = buffer[:match.end()].strip(), buffer[match.end():]
+                    if phrase:
+                        self.speak(phrase)
+                    continue
+                if len(buffer) >= 190:
+                    cut = buffer.rfind(" ", 80, 190)
+                    if cut > 0:
+                        phrase, buffer = buffer[:cut].strip(), buffer[cut:]
+                        if phrase:
+                            self.speak(phrase)
+                        continue
+                break
+        if buffer.strip() and not self._stop_event.is_set():
+            self.speak(buffer.strip())

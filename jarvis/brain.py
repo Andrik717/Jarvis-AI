@@ -214,7 +214,7 @@ class JarvisBrain:
             return answer
         return None
 
-    def reply(self, user_text: str) -> str:
+    def reply(self, user_text: str, on_chunk=None) -> str:
         clean_text = _clean(user_text)
         if not clean_text:
             return ""
@@ -245,7 +245,7 @@ class JarvisBrain:
         messages.extend(self._context_messages())
         messages.append({"role": "user", "content": clean_text})
         payload = {
-            "model": model, "messages": messages, "stream": False, "think": _needs_deep_reasoning(clean_text), "keep_alive": "2h",
+            "model": model, "messages": messages, "stream": True, "think": _needs_deep_reasoning(clean_text), "keep_alive": "2h",
             "options": {"temperature": 0.3, "num_predict": 1000, "num_ctx": 8192,
                         "repeat_penalty": 1.08},
         }
@@ -254,9 +254,20 @@ class JarvisBrain:
             data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
             headers={"Content-Type": "application/json"}, method="POST",
         )
+        parts = []
         try:
             with urllib.request.urlopen(request, timeout=120) as response:
-                data = json.loads(response.read().decode("utf-8"))
+                for raw_line in response:
+                    if not raw_line.strip():
+                        continue
+                    packet = json.loads(raw_line.decode("utf-8"))
+                    piece = ((packet.get("message") or {}).get("content") or "")
+                    if piece:
+                        parts.append(piece)
+                        if on_chunk is not None:
+                            on_chunk(piece)
+                    if packet.get("done"):
+                        break
         except urllib.error.URLError as exc:
             reason = getattr(exc, "reason", exc)
             raise RuntimeError(
@@ -264,7 +275,7 @@ class JarvisBrain:
                  "и модель qwen3.5:9b установлена. "
                 f"Подробности: {reason}"
             ) from exc
-        answer = ((data.get("message") or {}).get("content") or "").strip()
+        answer = "".join(parts).strip()
         if not answer:
             raise RuntimeError("ИИ подключён, но вернул пустой ответ. Попробуй повторить вопрос.")
         self._remember_exchange(clean_text, answer)

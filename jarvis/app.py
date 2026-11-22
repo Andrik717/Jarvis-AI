@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import ctypes
 import threading
+import re
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
@@ -491,7 +492,29 @@ class JarvisWindow:
         return "break"
 
     def _process_request(self, question: str) -> str:
-        """Единый маршрут: команда или локальный ИИ; оба результата входят в контекст."""
+        """Единый маршрут с учётом контекста предыдущей команды."""
+        # Короткое уточнение города после ответа о погоде тоже является
+        # командой погоды, а не отдельным вопросом к языковой модели.
+        history = self.brain.history
+        if len(history) >= 2:
+            previous_user = history[-2].get("content", "")
+            previous_answer = history[-1].get("content", "")
+            weather_context = (
+                re.search(r"погод|температур", previous_user, re.IGNORECASE)
+                or previous_answer.casefold().startswith("сейчас в ")
+            )
+            city_followup = re.match(
+                r"^(?:а\s+)?(?:как\s+)?(?:в|для)\s+(.+?)[?.!]*$",
+                question.strip(),
+                re.IGNORECASE,
+            )
+            if weather_context and city_followup:
+                city = city_followup.group(1).strip()
+                contextual_answer = handle_command("погода в " + city)
+                if contextual_answer is not None:
+                    self.brain.record_exchange(question, contextual_answer)
+                    return contextual_answer
+
         answer = handle_command(question)
         if answer is not None:
             self.brain.record_exchange(question, answer)

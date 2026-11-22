@@ -195,6 +195,9 @@ def handle_command(user_text: str) -> str | None:
         "блокнот": (("блокнот", "notepad"), ["notepad.exe"]),
         "калькулятор": (("калькулятор", "кальк"), ["calc.exe"]),
         "проводник": (("проводник", "папки"), ["explorer.exe", str(Path.home())]),
+        "диспетчер задач": (("диспетчер задач", "диспетчер"), ["taskmgr.exe"]),
+        "paint": (("paint", "пейнт", "рисование"), ["mspaint.exe"]),
+        "ножницы": (("ножницы", "снимок экрана"), ["SnippingTool.exe"]),
     }
     app_match = re.match(r"^(?:открой|запусти|включи)\s+(.+)$", text)
     if app_match:
@@ -213,6 +216,15 @@ def handle_command(user_text: str) -> str | None:
                 return "Открываю браузер."
             except OSError as exc:
                 return f"Не удалось открыть браузер. Причина: {exc}"
+
+        if target in ("параметры", "настройки windows", "настройки системы"):
+            try:
+                if os.name != "nt":
+                    return "Открытие параметров Windows доступно только в Windows."
+                os.startfile("ms-settings:")
+                return "Открываю параметры Windows."
+            except OSError as exc:
+                return f"Не удалось открыть параметры Windows. Причина: {exc}"
 
         folder_aliases = {
             "загрузки": "загрузки", "папку загрузки": "загрузки",

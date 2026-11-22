@@ -30,6 +30,7 @@ class JarvisWindow:
         self.tts = SpeechOutput(self.settings)
         self._busy = False
         self._recording = False
+        self._speech_cancelled = threading.Event()
         self.last_answer = ""
 
         self.root = tk.Tk()
@@ -47,6 +48,11 @@ class JarvisWindow:
                  font=("Segoe UI", 28, "bold")).pack()
         tk.Label(header, text="ГОЛОСОВОЙ ИИ-ПОМОЩНИК",
                  bg=BG, fg=MUTED, font=("Segoe UI", 10, "bold")).pack(pady=(2, 0))
+        self.core = tk.Canvas(header, width=210, height=94, bg=BG,
+                              highlightthickness=0, bd=0)
+        self.core.pack(pady=(5, 0))
+        self._core_phase = 0
+        self._animate_core()
 
         status_panel = tk.Frame(self.root, bg=PANEL, highlightthickness=1,
                                 highlightbackground="#173747")
@@ -61,7 +67,16 @@ class JarvisWindow:
             activebackground="#1b5962", activeforeground="#ffffff",
             disabledforeground="#a7bec4", relief="flat", bd=0, cursor="hand2",
             padx=18, pady=20)
-        self.listen_button.pack(fill="x", padx=28, pady=(4, 8))
+        voice_row = tk.Frame(self.root, bg=BG)
+        voice_row.pack(fill="x", padx=28, pady=(4, 8))
+        self.listen_button.pack(in_=voice_row, side="left", fill="x", expand=True)
+        self.stop_button = tk.Button(
+            voice_row, text="■  СТОП", command=self.stop_speaking,
+            font=("Segoe UI", 12, "bold"), bg="#642b36", fg="#ffffff",
+            activebackground="#8b3545", activeforeground="#ffffff",
+            relief="flat", bd=0, cursor="hand2", padx=22, pady=20,
+            state="disabled")
+        self.stop_button.pack(side="right", padx=(10, 0))
 
         tk.Label(self.root,
                  text="Говорите после нажатия. Джарвис распознает фразу, ответит и произнесёт ответ.",
@@ -158,6 +173,35 @@ class JarvisWindow:
             font=("Segoe UI", 9, "bold"), bg="#26323a", fg=TEXT,
             activebackground="#3a4b55", activeforeground=TEXT,
             relief="flat", bd=0, cursor="hand2", padx=14, pady=11).pack(side="right")
+
+    def _animate_core(self):
+        """Небольшая анимация ядра; работает только в главном Tk-потоке."""
+        try:
+            self.core.delete("pulse")
+            phase = self._core_phase % 24
+            for ring in range(3):
+                radius = 17 + ring * 12 + ((phase + ring * 5) % 12)
+                x0, y0 = 105 - radius, 45 - radius
+                x1, y1 = 105 + radius, 45 + radius
+                self.core.create_oval(x0, y0, x1, y1, outline="#1b6572",
+                                      width=1, tags="pulse")
+            self.core.create_oval(91, 31, 119, 59, fill="#123d4b",
+                                  outline=CYAN, width=2, tags="pulse")
+            self.core.create_oval(100, 40, 110, 50, fill=CYAN,
+                                  outline="", tags="pulse")
+            self.core.create_text(105, 83, text="J.A.R.V.I.S.  •  CORE ONLINE",
+                                  fill=MUTED, font=("Segoe UI", 8, "bold"), tags="pulse")
+            self._core_phase += 1
+            self.root.after(90, self._animate_core)
+        except tk.TclError:
+            pass
+
+    def stop_speaking(self):
+        """Прерывает только текущую/ожидающую озвучку, не отменяя вычисление ответа."""
+        self._speech_cancelled.set()
+        self.tts.stop()
+        self.status.set("ОЗВУЧКА ОСТАНОВЛЕНА")
+        self.stop_button.configure(state="disabled")
 
     def _append(self, line: str):
         self.log.insert("end", line + "\n")
@@ -364,6 +408,7 @@ class JarvisWindow:
         self.voice_button.configure(state="disabled" if busy else "normal")
         self.send_button.configure(state="disabled" if busy else "normal")
         self.text_input.configure(state="disabled" if busy else "normal")
+        self.stop_button.configure(state="normal" if busy else "disabled")
 
     def _finish_busy(self):
         self._set_busy(False, self.status.get())
@@ -454,6 +499,7 @@ class JarvisWindow:
 
     def _listen_worker(self, audio):
         try:
+            self._speech_cancelled.clear()
             self._ui(self.status.set, "РАСПОЗНАЮ РЕЧЬ…")
             recognized = self.asr.transcribe(audio)
             if not recognized:
@@ -464,8 +510,9 @@ class JarvisWindow:
             answer = self._process_request(recognized)
             self._ui(self._append, "ДЖАРВИС: " + answer)
             self._ui(self._set_last_answer, answer)
-            self._ui(self.status.set, "ОТВЕЧАЮ ГОЛОСОМ…")
-            self.tts.speak(answer)
+            if not self._speech_cancelled.is_set():
+                self._ui(self.status.set, "ОТВЕЧАЮ ГОЛОСОМ…")
+                self.tts.speak(answer)
             self._ui(self.status.set, "ГОТОВ. МОЖЕТЕ ГОВОРИТЬ ЕЩЁ РАЗ.")
         except Exception as exc:
             self._ui(self._append, "ОШИБКА: " + str(exc))
@@ -489,10 +536,12 @@ class JarvisWindow:
     def test_voice(self):
         if self._busy:
             return
+        self._speech_cancelled.clear()
         self._set_busy(True, "ПРОВЕРЯЮ НЕЙРОСЕТЕВОЙ РУССКИЙ ГОЛОС…")
         def worker():
             try:
-                self.tts.speak("Здравствуйте. Я Джарвис. Теперь я говорю более естественным голосом.")
+                if not self._speech_cancelled.is_set():
+                    self.tts.speak("Здравствуйте. Я Джарвис. Теперь я говорю более естественным голосом.")
                 self._ui(self.status.set, "ПРОВЕРКА ГОЛОСА ЗАВЕРШЕНА")
             except Exception as exc:
                 self._ui(self._append, "ОШИБКА ГОЛОСА: " + str(exc))

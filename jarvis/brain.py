@@ -66,6 +66,17 @@ def _atomic_json(path: Path, value) -> None:
 def _clean(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip()
 
+
+def _needs_deep_reasoning(text: str) -> bool:
+    """Включает более глубокий режим для задач анализа и разработки."""
+    lowered = text.casefold()
+    markers = (
+        "код", "программ", "скрипт", "ошиб", "исправ", "отлад",
+        "проанализ", "разбер", "проект", "файл", "архитект",
+        "рефактор", "тест", "баг", "почему не работает",
+    )
+    return any(marker in lowered for marker in markers)
+
 class JarvisBrain:
     def __init__(self, settings):
         self.settings = settings
@@ -190,7 +201,7 @@ class JarvisBrain:
         messages.extend(self._context_messages())
         messages.append({"role": "user", "content": clean_text})
         payload = {
-            "model": model, "messages": messages, "stream": False, "think": False, "keep_alive": "2h",
+            "model": model, "messages": messages, "stream": False, "think": _needs_deep_reasoning(clean_text), "keep_alive": "2h",
             "options": {"temperature": 0.35, "num_predict": 1200, "num_ctx": 4096,
                         "repeat_penalty": 1.08},
         }

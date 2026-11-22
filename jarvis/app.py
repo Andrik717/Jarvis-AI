@@ -29,6 +29,7 @@ class JarvisWindow:
         self.brain = JarvisBrain(self.settings)
         self.tts = SpeechOutput(self.settings)
         self._busy = False
+        self._recording = False
         self.last_answer = ""
 
         self.root = tk.Tk()
@@ -368,10 +369,55 @@ class JarvisWindow:
         self._set_busy(False, self.status.get())
 
     def listen(self):
+        """Переключает микрофон: начать запись или отправить текущую."""
         if self._busy:
             return
-        self._set_busy(True, "СЛУШАЮ… ГОВОРИТЕ В МИКРОФОН")
-        threading.Thread(target=self._listen_worker, daemon=True).start()
+        if self._recording:
+            self._send_recording()
+            return
+        try:
+            self.mic.start_recording()
+            self._recording = True
+            self.status.set("ИДЁТ ЗАПИСЬ… НАЖМИТЕ «ОТПРАВИТЬ», КОГДА ЗАКОНЧИТЕ")
+            self.listen_button.configure(
+                text="➤  ОТПРАВИТЬ ГОЛОСОВОЕ",
+                bg="#17616a",
+                activebackground="#21808a",
+            )
+        except Exception as exc:
+            self._recording = False
+            self.status.set("НЕ УДАЛОСЬ ВКЛЮЧИТЬ МИКРОФОН")
+            self._append("ОШИБКА МИКРОФОНА: " + str(exc))
+
+    def _send_recording(self):
+        """Останавливает запись по нажатию отправки и передаёт аудио на обработку."""
+        if not self._recording or self._busy:
+            return
+        try:
+            audio = self.mic.stop_recording()
+            self._recording = False
+            if audio.size == 0:
+                self.status.set("ЗАПИСЬ ПУСТАЯ. ПОПРОБУЙТЕ ЕЩЁ РАЗ.")
+                self.listen_button.configure(
+                    text="🎙   НАЖМИТЕ, ЧТОБЫ ГОВОРИТЬ",
+                    bg=GREEN,
+                    activebackground="#1b5962",
+                )
+                return
+            self._set_busy(True, "ОТПРАВЛЯЮ ЗАПИСЬ НА РАСПОЗНАВАНИЕ…")
+            threading.Thread(
+                target=self._listen_worker, args=(audio,), daemon=True
+            ).start()
+        except Exception as exc:
+            self._recording = False
+            self.status.set("НЕ УДАЛОСЬ ОТПРАВИТЬ ГОЛОСОВОЕ СООБЩЕНИЕ")
+            self._append("ОШИБКА ЗАПИСИ: " + str(exc))
+            self.listen_button.configure(
+                state="normal",
+                text="🎙   НАЖМИТЕ, ЧТОБЫ ГОВОРИТЬ",
+                bg=GREEN,
+                activebackground="#1b5962",
+            )
 
     def send_text(self, event=None):
         """Отправляет набранный текст, не включая микрофон и озвучку."""
@@ -400,9 +446,8 @@ class JarvisWindow:
         finally:
             self._ui(self._finish_busy)
 
-    def _listen_worker(self):
+    def _listen_worker(self, audio):
         try:
-            audio = self.mic.record(5.0)
             self._ui(self.status.set, "РАСПОЗНАЮ РЕЧЬ…")
             recognized = self.asr.transcribe(audio)
             if not recognized:

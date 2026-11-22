@@ -101,7 +101,7 @@ try {
         throw 'Downloaded pc_control.py is missing allowlisted application closing.'
     }
 
-    if (-not (Select-String -LiteralPath $stagedApp -Pattern 'handle_command\(question, previous_user_text=previous_user_text\)' -Quiet)) {
+    if (-not (Select-String -LiteralPath $stagedApp -SimpleMatch -Pattern 'handle_command(question, previous_user_text=previous_user_text)' -Quiet)) {
         throw 'Downloaded app.py is not passing recent dialogue context to command routing.'
     }
 

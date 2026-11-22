@@ -260,7 +260,7 @@ def handle_command(user_text: str) -> str | None:
         "почту": ("почту", "https://mail.google.com"),
         "почта": ("почту", "https://mail.google.com"),
     }
-    site_match = re.match(r"^(?:открой|запусти|перейди на)\s+(?:сайт\s+)?(.+)$", text)
+    site_match = re.match(r"^(?:открой(?:те)?|открою|открывай(?:те)?|запусти(?:те)?|запускай(?:те)?|включи(?:те)?|включай(?:те)?|перейди на|перейдите на)\s+(?:сайт\s+)?(.+)$", text)
     if site_match:
         target = site_match.group(1).strip()
         if target in websites:
@@ -280,7 +280,7 @@ def handle_command(user_text: str) -> str | None:
         "paint": (("paint", "пейнт", "рисование"), ["mspaint.exe"]),
         "ножницы": (("ножницы", "снимок экрана"), ["SnippingTool.exe"]),
     }
-    app_match = re.match(r"^(?:открой|запусти|включи)\s+(.+)$", text)
+    app_match = re.match(r"^(?:открой(?:те)?|открою|открывай(?:те)?|запусти(?:те)?|запускай(?:те)?|включи(?:те)?|включай(?:те)?|покажи)\s+(.+)$", text)
     if app_match:
         target = app_match.group(1).strip()
         for display, (aliases, command) in apps.items():

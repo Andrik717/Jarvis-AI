@@ -226,10 +226,14 @@ class JarvisBrain:
             answer = f"Сейчас в настройках Джарвиса выбрана модель {model_name}. "
             answer += "Она работает локально через Ollama."
             self._remember_exchange(clean_text, answer)
+            if on_chunk is not None:
+                on_chunk(answer)
             return answer
 
         command_answer = self._memory_command(clean_text)
         if command_answer is not None:
+            if on_chunk is not None:
+                on_chunk(command_answer)
             return command_answer
 
         base = (self.settings.llm_base_url or "http://localhost:11434").rstrip("/")

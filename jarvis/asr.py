@@ -42,11 +42,11 @@ class SpeechRecognizer:
         parts = []
 
         def field(name: str, value: str) -> None:
-            parts.append(
+            parts.append((
                 f"--{boundary}\r\n"
                 f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
-                f"{value}\r\n".encode("utf-8")
-            )
+                f"{value}\r\n"
+            ).encode("utf-8"))
 
         field("model", "gpt-transcribe")
         field("languages[]", "ru")

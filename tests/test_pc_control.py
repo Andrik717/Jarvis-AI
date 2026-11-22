@@ -31,6 +31,12 @@ class CommandRoutingTests(unittest.TestCase):
         )
 
     @patch("jarvis.pc_control.subprocess.Popen")
+    def test_polite_request_opens_notepad(self, popen):
+        answer = pc_control.handle_command("Можешь открыть мне блокнот, пожалуйста?")
+        self.assertEqual(answer, "Открываю блокнот.")
+        popen.assert_called_once_with(["notepad.exe"])
+
+    @patch("jarvis.pc_control.subprocess.Popen")
     def test_common_asr_typo_opens_notepad(self, popen):
         answer = pc_control.handle_command("Открой блакнот")
         self.assertEqual(answer, "Открываю блокнот.")

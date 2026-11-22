@@ -30,7 +30,7 @@ class SpeechRecognizer:
             wav.writeframes(pcm)
         return output.getvalue()
 
-    def _transcribe_cloud(self, audio: np.ndarray, api_key: str) -> str:
+    def _transcribe_cloud(self, audio: np.ndarray, api_key: str, context: str = "") -> str:
         audio_data = self._wav_bytes(audio)
         if len(audio_data) > 24 * 1024 * 1024:
             raise RuntimeError(
@@ -57,7 +57,9 @@ class SpeechRecognizer:
             "Не заменяй непонятные слова догадками и не добавляй слова, "
             "которых не было в аудио. Контекст: пользователь разговаривает "
             "с голосовым помощником Джарвисом о Windows, настройках и "
-            "компьютере."
+            "компьютере. Учитывай контекст предыдущих реплик только для правильного написания "
+            "имён и терминов; не вставляй слова, которых не слышно."
+            + (" Контекст диалога: " + context[:500] if context else "")
         )
         for keyword in (
             "Джарвис", "Jarvis", "Windows", "Ollama", "Whisper",
@@ -114,30 +116,30 @@ class SpeechRecognizer:
             )
         return self._model
 
-    def _transcribe_local(self, audio: np.ndarray) -> str:
+    def _transcribe_local(self, audio: np.ndarray, context: str = "") -> str:
+        prompt = (
+            "Это естественный разговор пользователя с голосовым помощником Джарвисом на русском языке. "
+            "Сохраняй разговорную форму, окончания, отрицания, числа и вопросительную интонацию. "
+            "Не додумывай слова и не подменяй неразборчивое слово догадкой. "
+            "Возможные названия: Джарвис, Jarvis, Ollama, Windows, Telegram, Steam, YouTube, "
+            "Екатеринбург, Москва, Whisper, PowerShell, Python, микрофон. "
+            + ("Недавний контекст разговора: " + context[:350] if context else "")
+        )
         segments, _ = self._get_model().transcribe(
             audio.astype(np.float32, copy=False),
             language=self.settings.language,
             beam_size=max(1, min(5, int(self.settings.beam_size))),
             vad_filter=self.settings.vad_filter,
             condition_on_previous_text=False,
-            initial_prompt=(
-                "Это естественный разговор пользователя с голосовым помощником "
-                "Джарвисом на русском языке. Сохраняй разговорную форму, окончания, "
-                "отрицания, числа и вопросительную интонацию. Не додумывай слова. "
-                "Если слово неразборчиво, не подменяй его похожим по теме. "
-                "Возможные названия и термины: Джарвис, Jarvis, Ollama, Windows, "
-                "Telegram, Steam, YouTube, Екатеринбург, Москва, Whisper, "
-                "PowerShell, Python, микрофон, распознавание речи."
-            ),
+            initial_prompt=prompt,
             temperature=0.0,
         )
         return " ".join(segment.text.strip() for segment in segments).strip()
 
-    def transcribe(self, audio: np.ndarray) -> str:
+    def transcribe(self, audio: np.ndarray, context: str = "") -> str:
         if audio.size == 0:
             return ""
         api_key = os.environ.get("OPENAI_API_KEY", "").strip()
         if api_key:
-            return self._transcribe_cloud(audio, api_key)
-        return self._transcribe_local(audio)
+            return self._transcribe_cloud(audio, api_key, context)
+        return self._transcribe_local(audio, context)

@@ -90,6 +90,8 @@ def _search_web(query: str) -> str:
 
 def _normalize(value: str) -> str:
     text = str(value or "").casefold().replace("ё", "е")
+    # Вежливые слова не должны мешать извлечению названия команды.
+    text = re.sub(r"\\bпожалуйста\\b", " ", text)
     text = re.sub(r"[^а-яa-z0-9 ]+", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
     return re.sub(r"^(?:эй )?джарвис[ ,]*", "", text).strip()

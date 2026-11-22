@@ -19,7 +19,7 @@ class Settings:
     sapi_rate: int = 0
     sapi_volume: int = 100
     llm_base_url: str = "http://localhost:11434"
-    llm_model: str = "qwen2.5:3b"
+    llm_model: str = "qwen3.5:9b"
     # API key intentionally loaded only from environment, never serialized.
 
 
@@ -44,8 +44,10 @@ def load_settings() -> Settings:
     data["tts_voice"] = "ru-RU-DmitryNeural"
     if not data.get("llm_base_url"):
         data["llm_base_url"] = "http://localhost:11434"
-    if not data.get("llm_model"):
-        data["llm_model"] = "qwen2.5:3b"
+    # Переключаем стандартную старую модель на установленную Qwen 3.5 9B,
+    # но сохраняем любые пользовательские названия моделей.
+    if not data.get("llm_model") or data.get("llm_model") == "qwen2.5:3b":
+        data["llm_model"] = "qwen3.5:9b"
     allowed = Settings.__dataclass_fields__.keys()
     return Settings(**{k: v for k, v in data.items() if k in allowed})
 

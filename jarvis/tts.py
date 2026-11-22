@@ -1,9 +1,8 @@
-"""Надёжная озвучка Jarvis: Edge TTS (Дмитрий) + резервный Windows SAPI."""
+"""Озвучка Jarvis только через Edge TTS (мужской голос Дмитрия)."""
 from __future__ import annotations
 
 import asyncio
 import os
-import platform
 import re
 import tempfile
 import threading
@@ -28,42 +27,7 @@ def _speech_text(value: str) -> str:
 class SpeechOutput:
     def __init__(self, settings: Settings):
         self.settings = settings
-        self._engine = None
         self._stop_event = threading.Event()
-        self.last_fallback_error = None
-
-    def _sapi(self):
-        """Локальный бесплатный резервный голос Windows."""
-        if platform.system() != "Windows":
-            raise RuntimeError("Резервный Windows SAPI доступен только в Windows")
-        if self._engine is None:
-            import win32com.client
-
-            engine = win32com.client.Dispatch("SAPI.SpVoice")
-            engine.Rate = max(-10, min(10, int(self.settings.sapi_rate)))
-            engine.Volume = max(0, min(100, int(self.settings.sapi_volume)))
-            voices = engine.GetVoices()
-            russian = []
-            for index in range(voices.Count):
-                voice = voices.Item(index)
-                description = str(voice.GetDescription())
-                lowered = description.casefold()
-                if "russian" in lowered or "рус" in lowered or "ru-ru" in lowered:
-                    russian.append((voice, lowered))
-            if russian:
-                # Если среди русских голосов есть мужской, предпочитаем его.
-                male_markers = ("male", "муж", "dmitry", "дмитрий", "pavel", "павел", "andrey", "андрей")
-                selected = next(
-                    (voice for voice, desc in russian if any(marker in desc for marker in male_markers)),
-                    russian[0][0],
-                )
-                engine.Voice = selected
-            elif voices.Count:
-                # Не оставляем пользователя без звука, если русского SAPI-голоса нет:
-                # используем системный голос Windows как крайний резерв.
-                engine.Voice = voices.Item(0)
-            self._engine = engine
-        return self._engine
 
     def _edge(self, text: str) -> None:
         import edge_tts
@@ -125,7 +89,6 @@ class SpeechOutput:
 
     def reset_stop(self) -> None:
         self._stop_event.clear()
-        self.last_fallback_error = None
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -135,40 +98,15 @@ class SpeechOutput:
                 pygame.mixer.music.stop()
         except Exception:
             pass
-        try:
-            if self._engine is not None:
-                # SAPI flag 3: асинхронный вызов + очистка очереди речи.
-                self._engine.Speak("", 3)
-        except Exception:
-            pass
 
     def speak(self, text: str) -> None:
         text = _speech_text(text)
         if not text or self._stop_event.is_set():
             return
 
-        backend = getattr(self.settings, "tts_backend", "edge")
-        if backend == "sapi":
-            self._sapi().Speak(text, 0)
-            return
-
-        try:
-            self._edge(text)
-        except Exception as edge_error:
-            if self._stop_event.is_set():
-                return
-            # Важно: не оставляем пользователя без речи при сбое облачного Edge TTS.
-            try:
-                self._sapi().Speak(text, 0)
-                if self.last_fallback_error is None:
-                    self.last_fallback_error = str(edge_error)
-            except Exception as sapi_error:
-                raise RuntimeError(
-                    "Не сработал Edge TTS: "
-                    + str(edge_error)
-                    + " | Не удалось запустить резервный голос Windows: "
-                    + str(sapi_error)
-                ) from sapi_error
+        # Единственный движок озвучки — Edge TTS с выбранным голосом Дмитрия.
+        # При ошибке сообщаем её вызывающему коду; системный голос Windows не запускаем.
+        self._edge(text)
 
     def speak_stream(self, chunks) -> None:
         """Озвучивает законченные фразы по мере поступления текста."""

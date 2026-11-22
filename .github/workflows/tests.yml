@@ -23,9 +23,15 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Validate updater PowerShell syntax
+      - name: Validate updater PowerShell 7 syntax
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           [scriptblock]::Create((Get-Content -LiteralPath 'update.ps1' -Raw)) | Out-Null
-          Write-Host 'update.ps1 PowerShell syntax is valid.'
+          Write-Host 'update.ps1 PowerShell 7 syntax is valid.'
+      - name: Validate updater Windows PowerShell 5.1 syntax
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          [scriptblock]::Create((Get-Content -LiteralPath 'update.ps1' -Raw)) | Out-Null
+          Write-Host 'update.ps1 Windows PowerShell 5.1 syntax is valid.'

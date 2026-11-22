@@ -8,6 +8,7 @@ $stage = Join-Path $root '.jarvis_update_staging'
 $files = @(
     'jarvis/brain.py',
     'jarvis/app.py',
+    'jarvis/tts.py',
     'jarvis/audio.py',
     'jarvis/config.py',
     'jarvis/asr.py',

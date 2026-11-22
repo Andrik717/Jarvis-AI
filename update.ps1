@@ -52,6 +52,11 @@ try {
         Write-Host "Downloaded: $relative"
     }
 
+    $stagedTts = Join-Path $stage 'jarvis\tts.py'
+    if (-not (Select-String -LiteralPath $stagedTts -Pattern '^\s*def reset_stop\(' -Quiet)) {
+        throw 'Downloaded jarvis/tts.py does not contain SpeechOutput.reset_stop. No project files were changed.'
+    }
+
     Write-Host 'Checking downloaded Python files...'
     $compileArgs = @('-3.12', '-m', 'py_compile') + $stagedFiles
     & py @compileArgs
@@ -80,6 +85,11 @@ try {
         $installedTargets.Add($target)
         Copy-Item -LiteralPath $source -Destination $target -Force
         Write-Host "Installed: $relative"
+    }
+
+    $installedTts = Join-Path $root 'jarvis\tts.py'
+    if (-not (Select-String -LiteralPath $installedTts -Pattern '^\s*def reset_stop\(' -Quiet)) {
+        throw 'Installed jarvis/tts.py is missing SpeechOutput.reset_stop.'
     }
 
     Write-Host 'Checking installed Python files...'

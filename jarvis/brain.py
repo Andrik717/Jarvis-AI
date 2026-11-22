@@ -184,6 +184,22 @@ class JarvisBrain:
         clean_text = _clean(user_text)
         if not clean_text:
             return ""
+
+        # Отвечаем о модели по реальной настройке приложения, а не просим LLM
+        # угадывать собственную конфигурацию.
+        model_question = re.search(
+            r"(?:какая|какую|что за)\\s+(?:у тебя\\s+)?модел|"
+            r"какую\\s+модель\\s+(?:ты\\s+)?использу|"
+            r"на какой\\s+модели",
+            clean_text.casefold(),
+        )
+        if model_question:
+            model_name = (self.settings.llm_model or "не указана").strip()
+            answer = f"Сейчас в настройках Джарвиса выбрана модель {model_name}. "
+            answer += "Она работает локально через Ollama."
+            self._remember_exchange(clean_text, answer)
+            return answer
+
         command_answer = self._memory_command(clean_text)
         if command_answer is not None:
             return command_answer

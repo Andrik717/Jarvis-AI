@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from difflib import SequenceMatcher
 import os
 import re
 import subprocess
@@ -92,6 +93,13 @@ def _normalize(value: str) -> str:
     text = re.sub(r"[^а-яa-z0-9 ]+", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
     return re.sub(r"^(?:эй )?джарвис[ ,]*", "", text).strip()
+
+
+def _is_close_alias(target: str, aliases: tuple[str, ...]) -> bool:
+    """Осторожно распознаёт очевидную одиночную опечатку в известной команде."""
+    if len(target) < 5 or len(target.split()) > 2:
+        return False
+    return any(SequenceMatcher(None, target, alias).ratio() >= 0.82 for alias in aliases)
 
 
 def _open_url(url: str) -> None:
@@ -276,7 +284,7 @@ def handle_command(user_text: str) -> str | None:
     if app_match:
         target = app_match.group(1).strip()
         for display, (aliases, command) in apps.items():
-            if target in aliases:
+            if target in aliases or _is_close_alias(target, aliases):
                 try:
                     subprocess.Popen(command)
                     return f"Открываю {display}."

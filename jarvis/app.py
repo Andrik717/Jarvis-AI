@@ -557,9 +557,28 @@ class JarvisWindow:
             if speaker.is_alive():
                 speaker.join()
             if speech_error and not self._speech_cancelled.is_set():
-                self._ui(self._append, "ОШИБКА ОЗВУЧКИ: " + str(speech_error[0]))
-                self._ui(self.status.set, "ТЕКСТ ГОТОВ, НО НЕ УДАЛОСЬ ВОСПРОИЗВЕСТИ ГОЛОС")
-                return
+                # Потоковая озвучка отдельными короткими фразами иногда
+                # получает от Edge TTS ответ без аудио. В таком случае
+                # повторно озвучиваем полный ответ одним запросом — это
+                # прежний, более надёжный режим.
+                stream_error = speech_error[0]
+                try:
+                    self._ui(self.status.set, "ПЕРЕКЛЮЧАЮСЬ НА НАДЁЖНЫЙ РЕЖИМ ОЗВУЧКИ…")
+                    self.tts.speak(answer)
+                    self._ui(
+                        self._append,
+                        "СИСТЕМА: потоковая озвучка временно недоступна; ответ озвучен обычным режимом."
+                    )
+                except Exception as fallback_error:
+                    self._ui(
+                        self._append,
+                        "ОШИБКА ОЗВУЧКИ: потоковый режим: "
+                        + str(stream_error)
+                        + " | резервный режим: "
+                        + str(fallback_error)
+                    )
+                    self._ui(self.status.set, "ТЕКСТ ГОТОВ, НО EDGE TTS НЕ ВЕРНУЛ АУДИО")
+                    return
             self._ui(self.status.set, "ГОТОВ. МОЖЕТЕ ГОВОРИТЬ ЕЩЁ РАЗ.")
         except Exception as exc:
             self._ui(self._append, "ОШИБКА: " + str(exc))

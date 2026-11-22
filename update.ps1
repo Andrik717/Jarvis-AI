@@ -71,6 +71,11 @@ try {
         throw 'Downloaded app.py is missing contextual follow-up handling.'
     }
 
+    $stagedPcControl = Join-Path $stage 'jarvis\pc_control.py'
+    if (-not (Select-String -LiteralPath $stagedPcControl -Pattern 'def _search_web\(' -Quiet)) {
+        throw 'Downloaded pc_control.py is missing in-chat web search.'
+    }
+
     Write-Host 'Checking downloaded Python files...'
     $compileArgs = @('-3.12', '-m', 'py_compile') + $stagedFiles
     & py @compileArgs

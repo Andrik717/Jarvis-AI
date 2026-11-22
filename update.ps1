@@ -13,7 +13,8 @@ $files = @(
     "jarvis/audio.py",
     "jarvis/config.py",
     "jarvis/asr.py",
-    "jarvis/pc_control.py"
+    "jarvis/pc_control.py",
+    "jarvis_tts_diagnostic.py"
 )
 $stagedFiles = @()
 $installedTargets = @()
@@ -138,6 +139,24 @@ try {
     & py @installedCompileArgs
     if ($LASTEXITCODE -ne 0) {
         throw "Installed files failed the Python syntax check."
+    }
+
+    Write-Host ""
+    Write-Host "Updating Edge TTS package..."
+    & py -3.12 -m pip install --upgrade edge-tts
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "WARNING: Edge TTS package could not be upgraded. The diagnostic will show the installed version." -ForegroundColor Yellow
+    }
+
+    Write-Host ""
+    Write-Host "Testing Dmitry voice directly, outside the Jarvis interface..."
+    & py -3.12 (Join-Path $root "jarvis_tts_diagnostic.py")
+    $ttsDiagnosticExit = $LASTEXITCODE
+    if ($ttsDiagnosticExit -eq 0) {
+        Write-Host "Edge TTS direct test passed." -ForegroundColor Green
+    }
+    else {
+        Write-Host "WARNING: Edge TTS direct test failed (exit $ttsDiagnosticExit). The report above identifies the local failure; Windows fallback remains available." -ForegroundColor Yellow
     }
 
     $success = $true

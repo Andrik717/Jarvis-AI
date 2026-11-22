@@ -556,6 +556,11 @@ class JarvisWindow:
             self._ui(self._set_last_answer, answer)
             if speaker.is_alive():
                 speaker.join()
+            if self.tts.last_fallback_error and not self._speech_cancelled.is_set():
+                self._ui(
+                    self._append,
+                    "СИСТЕМА: Edge TTS не вернул аудио; ответ произнесён резервным голосом Windows."
+                )
             if speech_error and not self._speech_cancelled.is_set():
                 # Потоковая озвучка отдельными короткими фразами иногда
                 # получает от Edge TTS ответ без аудио. В таком случае
@@ -609,6 +614,11 @@ class JarvisWindow:
             try:
                 if not self._speech_cancelled.is_set():
                     self.tts.speak("Здравствуйте. Я Джарвис. Теперь я говорю более естественным голосом.")
+                    if self.tts.last_fallback_error:
+                        self._ui(
+                            self._append,
+                            "СИСТЕМА: Edge TTS недоступен; проверка выполнена резервным голосом Windows."
+                        )
                 self._ui(self.status.set, "ПРОВЕРКА ГОЛОСА ЗАВЕРШЕНА")
             except Exception as exc:
                 self._ui(self._append, "ОШИБКА ГОЛОСА: " + str(exc))

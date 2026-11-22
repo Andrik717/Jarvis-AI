@@ -560,7 +560,17 @@ class JarvisWindow:
             self._ui(self._set_last_answer, answer)
             if not self._speech_cancelled.is_set():
                 self._ui(self.status.set, "ОТВЕЧАЮ ГОЛОСОМ…")
-                self.tts.speak(answer)
+                try:
+                    self.tts.speak(answer)
+                except Exception as speech_exc:
+                    # Текстовый ответ уже готов: сбой TTS не должен
+                    # маскироваться под ошибку обработки всего запроса.
+                    self._ui(self._append, "ОШИБКА ОЗВУЧКИ: " + str(speech_exc))
+                    self._ui(
+                        self.status.set,
+                        "ТЕКСТОВЫЙ ОТВЕТ ГОТОВ, НО НЕ УДАЛОСЬ ВОСПРОИЗВЕСТИ ГОЛОС"
+                    )
+                    return
             self._ui(self.status.set, "ГОТОВ. МОЖЕТЕ ГОВОРИТЬ ЕЩЁ РАЗ.")
         except Exception as exc:
             self._ui(self._append, "ОШИБКА: " + str(exc))

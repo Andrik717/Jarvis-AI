@@ -114,7 +114,7 @@ try {
 
     Write-Host 'Creating backups and installing files...'
     foreach ($relative in $files) {
-        $localRelative = $relative.Replace('/', '\')
+        $localRelative = $relative.Replace([char]47, [char]92)
         $target = Join-Path $root $localRelative
         $source = Join-Path $stage $localRelative
         $targetDirectory = Split-Path -Parent $target

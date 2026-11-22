@@ -25,8 +25,21 @@ try {
     if (-not (Test-Path -LiteralPath (Join-Path $root "jarvis\__init__.py"))) {
         throw "The jarvis package was not found. Run this updater from the project folder."
     }
-    if (-not (Get-Command py -ErrorAction SilentlyContinue)) {
-        throw "Python launcher py was not found."
+    # Use the same interpreter as run.bat. Otherwise the updater may test
+    # system Python while Jarvis actually runs from the project .venv.
+    $venvPython = Join-Path $root ".venv\Scripts\python.exe"
+    if (Test-Path -LiteralPath $venvPython) {
+        $pythonCommand = $venvPython
+        $pythonPrefixArgs = @()
+        Write-Host "Runtime Python: project .venv"
+    }
+    elseif (Get-Command py -ErrorAction SilentlyContinue) {
+        $pythonCommand = "py"
+        $pythonPrefixArgs = @("-3.12")
+        Write-Host "Runtime Python: py -3.12 (run.bat fallback)"
+    }
+    else {
+        throw "Neither project .venv Python nor Python launcher py was found."
     }
 
     if (Test-Path -LiteralPath $stage) {
@@ -97,8 +110,8 @@ try {
     }
 
     Write-Host "Checking downloaded Python files..."
-    $compileArgs = @("-3.12", "-m", "py_compile") + $stagedFiles
-    & py @compileArgs
+    $compileArgs = $pythonPrefixArgs + @("-m", "py_compile") + $stagedFiles
+    & $pythonCommand @compileArgs
     if ($LASTEXITCODE -ne 0) {
         throw "Python syntax check failed. No project files were changed."
     }
@@ -132,22 +145,22 @@ try {
     }
 
     Write-Host "Checking installed Python files..."
-    $installedCompileArgs = @("-3.12", "-m", "py_compile") + $installedTargets
-    & py @installedCompileArgs
+    $installedCompileArgs = $pythonPrefixArgs + @("-m", "py_compile") + $installedTargets
+    & $pythonCommand @installedCompileArgs
     if ($LASTEXITCODE -ne 0) {
         throw "Installed files failed the Python syntax check."
     }
 
     Write-Host ""
     Write-Host "Updating Edge TTS package..."
-    & py -3.12 -m pip install --upgrade edge-tts
+    & $pythonCommand @($pythonPrefixArgs + @("-m", "pip", "install", "--upgrade", "edge-tts"))
     if ($LASTEXITCODE -ne 0) {
         Write-Host "WARNING: Edge TTS package could not be upgraded. The diagnostic will show the installed version." -ForegroundColor Yellow
     }
 
     Write-Host ""
     Write-Host "Testing Dmitry voice directly, outside the Jarvis interface..."
-    & py -3.12 (Join-Path $root "jarvis_tts_diagnostic.py")
+    & $pythonCommand @($pythonPrefixArgs + @((Join-Path $root "jarvis_tts_diagnostic.py")))
     $ttsDiagnosticExit = $LASTEXITCODE
     if ($ttsDiagnosticExit -eq 0) {
         Write-Host "Edge TTS direct test passed." -ForegroundColor Green

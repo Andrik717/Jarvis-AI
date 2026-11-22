@@ -569,13 +569,13 @@ class JarvisWindow:
                         self._append,
                         "СИСТЕМА: потоковая озвучка не сработала; выполнена повторная попытка через Edge TTS."
                     )
-                except Exception as fallback_error:
+                except Exception as retry_error:
                     self._ui(
                         self._append,
                         "ОШИБКА ОЗВУЧКИ: потоковый режим: "
                         + str(stream_error)
                         +  " | повторная попытка Edge TTS: "
-                        + str(fallback_error)
+                        + str(retry_error)
                     )
                     self._ui(self.status.set, "ТЕКСТ ГОТОВ, НО EDGE TTS НЕ ВЕРНУЛ АУДИО")
                     return

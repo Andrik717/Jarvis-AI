@@ -61,15 +61,15 @@ class JarvisWindow:
         tk.Label(status_panel, textvariable=self.status, bg=PANEL, fg=CYAN,
                  font=("Segoe UI", 11, "bold"), pady=10).pack()
 
+        voice_row = tk.Frame(self.root, bg=BG)
+        voice_row.pack(fill="x", padx=28, pady=(4, 8))
         self.listen_button = tk.Button(
-            self.root, text="🎙   НАЖМИТЕ, ЧТОБЫ ГОВОРИТЬ", command=self.listen,
+            voice_row, text="🎙   НАЖМИТЕ, ЧТОБЫ ГОВОРИТЬ", command=self.listen,
             font=("Segoe UI", 16, "bold"), bg=GREEN, fg="#ffffff",
             activebackground="#1b5962", activeforeground="#ffffff",
             disabledforeground="#a7bec4", relief="flat", bd=0, cursor="hand2",
             padx=18, pady=20)
-        voice_row = tk.Frame(self.root, bg=BG)
-        voice_row.pack(fill="x", padx=28, pady=(4, 8))
-        self.listen_button.pack(in_=voice_row, side="left", fill="x", expand=True)
+        self.listen_button.pack(side="left", fill="x", expand=True)
         self.stop_button = tk.Button(
             voice_row, text="■  СТОП", command=self.stop_speaking,
             font=("Segoe UI", 12, "bold"), bg="#642b36", fg="#ffffff",
@@ -449,6 +449,8 @@ class JarvisWindow:
                     activebackground="#1b5962",
                 )
                 return
+            self._speech_cancelled.clear()
+            self.tts.reset_stop()
             self._set_busy(True, "ОТПРАВЛЯЮ ЗАПИСЬ НА РАСПОЗНАВАНИЕ…")
             threading.Thread(
                 target=self._listen_worker, args=(audio,), daemon=True
@@ -499,7 +501,6 @@ class JarvisWindow:
 
     def _listen_worker(self, audio):
         try:
-            self._speech_cancelled.clear()
             self._ui(self.status.set, "РАСПОЗНАЮ РЕЧЬ…")
             recognized = self.asr.transcribe(audio)
             if not recognized:
@@ -537,6 +538,7 @@ class JarvisWindow:
         if self._busy:
             return
         self._speech_cancelled.clear()
+        self.tts.reset_stop()
         self._set_busy(True, "ПРОВЕРЯЮ НЕЙРОСЕТЕВОЙ РУССКИЙ ГОЛОС…")
         def worker():
             try:

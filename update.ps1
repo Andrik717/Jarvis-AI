@@ -172,11 +172,6 @@ catch {
     }
     exit 1
 }
-finally {
-    if ($success -and (Test-Path -LiteralPath $stage)) {
-        Remove-Item -LiteralPath $stage -Recurse -Force
-    }
-    elseif (Test-Path -LiteralPath $stage) {
-        Write-Host ('Staging files kept for diagnosis: ' + $stage)
-    }
+if ($success -and (Test-Path -LiteralPath $stage)) {
+    Remove-Item -LiteralPath $stage -Recurse -Force
 }

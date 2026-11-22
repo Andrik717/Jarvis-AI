@@ -19,7 +19,7 @@ class CommandRoutingTests(unittest.TestCase):
         popen.assert_called_once_with(["calc.exe"])
 
     def test_pronoun_close_uses_previous_open_command(self):
-        with patch("jarvis.pc_control.subprocess.run") as run:
+        with patch("jarvis.pc_control.os.name", "nt"), patch("jarvis.pc_control.subprocess.run") as run:
             run.return_value.returncode = 0
             answer = pc_control.handle_command(
                 "Закрой его", previous_user_text="Открою блокнот"

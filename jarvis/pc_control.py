@@ -5,12 +5,86 @@ import json
 import os
 import re
 import subprocess
+from html.parser import HTMLParser
 import urllib.error
 import urllib.parse
 import urllib.request
 import webbrowser
 from pathlib import Path
 from urllib.parse import quote_plus
+
+
+class _DuckDuckGoParser(HTMLParser):
+    """Извлекает заголовки, ссылки и краткие описания из HTML-поиска."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.results = []
+        self._capture = None
+        self._current = None
+
+    def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        classes = set((attributes.get("class") or "").split())
+        if tag == "a" and "result__a" in classes:
+            self._current = {"title": "", "url": attributes.get("href", ""), "snippet": ""}
+            self.results.append(self._current)
+            self._capture = "title"
+        elif "result__snippet" in classes and self.results:
+            self._current = self.results[-1]
+            self._capture = "snippet"
+
+    def handle_data(self, data):
+        if self._current is not None and self._capture in ("title", "snippet"):
+            self._current[self._capture] += data
+
+    def handle_endtag(self, tag):
+        if tag == "a" and self._capture == "title":
+            self._capture = None
+        elif tag in ("div", "span") and self._capture == "snippet":
+            self._capture = None
+
+
+def _search_web(query: str) -> str:
+    """Возвращает реальные результаты поиска в чат, не исполняя команды."""
+    url = "https://html.duckduckgo.com/html/?" + urllib.parse.urlencode({"q": query})
+    request = urllib.request.Request(
+        url,
+        headers={"User-Agent": "Mozilla/5.0 (compatible; JarvisAI/1.0)"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=12) as response:
+            page = response.read().decode("utf-8", errors="replace")
+    except (OSError, urllib.error.URLError, TimeoutError) as exc:
+        return f"Не удалось получить результаты поиска: {str(exc)[:140]}."
+
+    parser = _DuckDuckGoParser()
+    parser.feed(page)
+    results = []
+    for item in parser.results:
+        title = re.sub(r"\s+", " ", item["title"]).strip()
+        snippet = re.sub(r"\s+", " ", item["snippet"]).strip()
+        result_url = item["url"].strip()
+        parsed = urllib.parse.urlparse(result_url)
+        if "duckduckgo.com" in parsed.netloc:
+            result_url = urllib.parse.parse_qs(parsed.query).get("uddg", [result_url])[0]
+        if result_url.startswith("//"):
+            result_url = "https:" + result_url
+        if title and result_url.startswith(("http://", "https://")):
+            results.append((title, snippet, result_url))
+        if len(results) >= 4:
+            break
+
+    if not results:
+        return "Поисковая система не вернула читаемых результатов. Попробуй сформулировать запрос иначе."
+
+    lines = [f"Результаты поиска по запросу «{query}»: "]
+    for index, (title, snippet, result_url) in enumerate(results, 1):
+        lines.append(f"{index}. {title}")
+        if snippet:
+            lines.append(snippet)
+        lines.append(result_url)
+    return "\n".join(lines)
 
 
 def _normalize(value: str) -> str:
@@ -147,7 +221,7 @@ def handle_command(user_text: str) -> str | None:
             return "Назови город, для которого проверить погоду."
         return _weather_for_city(city)
 
-    # Поиск в интернете: открываем запрос в браузере, ничего не исполняем.
+    # Поиск в интернете: возвращаем заголовки и краткие описания в чат.
     search_match = re.match(
         r"^(?:найди(?: в интернете)?|поищи(?: в интернете)?|загугли)\s+(.+)$",
         text,
@@ -155,11 +229,10 @@ def handle_command(user_text: str) -> str | None:
     if search_match:
         query = search_match.group(1).strip()
         if query:
-            try:
-                _open_url("https://www.google.com/search?q=" + quote_plus(query))
-                return f"Ищу в интернете: {query}."
-            except OSError as exc:
-                return f"Не удалось открыть поиск. Причина: {exc}"
+            return _search_web(query)
+
+    if text in ("новости", "последние новости", "что нового"):
+        return _search_web("последние новости сегодня")
 
     # Разрешённые сайты и их разговорные названия.
     websites = {

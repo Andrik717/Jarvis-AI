@@ -634,7 +634,6 @@ class JarvisWindow:
         fields = [
             ("Адрес Ollama", self.settings.llm_base_url, "url"),
             ("Модель ИИ", self.settings.llm_model, "model"),
-            ("Русский голос", self.settings.tts_voice, "voice"),
         ]
         entries = {}
         for label, value, key in fields:
@@ -646,15 +645,14 @@ class JarvisWindow:
             entry.pack(fill="x", ipady=7)
             entries[key] = entry
 
-        tk.Label(frame, text="Голос Джарвиса по умолчанию: ru-RU-DmitryNeural (мужской). Можно указать другой голос Edge TTS.",
+        tk.Label(frame, text="Голос Джарвиса: ru-RU-DmitryNeural — мужской голос Дмитрия.",
                  bg=BG, fg=MUTED, font=("Segoe UI", 8), wraplength=390,
                  justify="left").pack(anchor="w", pady=(10, 12))
 
         def save():
             self.settings.llm_base_url = entries["url"].get().strip() or "http://localhost:11434"
             self.settings.llm_model = entries["model"].get().strip() or "qwen3.5:9b"
-            self.settings.tts_voice = entries["voice"].get().strip() or "ru-RU-DmitryNeural"
-            self.settings.tts_backend = "edge"
+            self.settings.tts_voice = "ru-RU-DmitryNeural"
             save_settings(self.settings)
             self.brain.settings = self.settings
             self.tts.settings = self.settings

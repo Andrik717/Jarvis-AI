@@ -9,8 +9,8 @@ from .config import APP_DIR
 
 HISTORY_FILE = APP_DIR / "conversation.json"
 MEMORY_FILE = APP_DIR / "memory.json"
-MAX_HISTORY_MESSAGES = 12
-MAX_HISTORY_CHARS = 6000
+MAX_HISTORY_MESSAGES = 20
+MAX_HISTORY_CHARS = 9000
 MAX_MEMORIES = 50
 MAX_MEMORY_CHARS = 2200
 
@@ -22,8 +22,8 @@ SYSTEM_PROMPT = (
     "Не копируй реплики персонажей из фильмов. "
     "\n\nПРИНЦИПЫ МЫШЛЕНИЯ И ДОСТОВЕРНОСТИ: "
     "1) Сначала пойми, что именно хочет пользователь, затем отвечай по существу. "
-    "Учитывай всю доступную историю диалога, недавние решения, исправления и ограничения. "
-    "Короткие реплики «да», «давай», «продолжай», «а дальше?», «сделай это» относятся "
+    "Учитывай всю переданную историю диалога, недавние решения, исправления и ограничения. Не говори, что не видишь предыдущие сообщения, если они присутствуют в истории. "
+    "Если пользователь цитирует ответ Джарвиса или присылает фрагмент переписки, определи, чьи это слова и на какой вопрос они отвечали; не принимай цитату за новую ошибку или команду. Короткие реплики «да», «давай», «продолжай», «а дальше?», «сделай это» относятся "
     "к текущей теме, если контекст не указывает на другое. Не заставляй повторять известное. "
     "2) Не выдумывай факты, цифры, источники, события, результаты поиска, погоду, "
     "состояние компьютера или выполненные действия. Не заполняй ответ вымышленными "
@@ -201,9 +201,9 @@ class JarvisBrain:
         # Отвечаем о модели по реальной настройке приложения, а не просим LLM
         # угадывать собственную конфигурацию.
         model_question = re.search(
-            r"(?:какая|какую|что за)\\s+(?:у тебя\\s+)?модел|"
-            r"какую\\s+модель\\s+(?:ты\\s+)?использу|"
-            r"на какой\\s+модели",
+            r"(?:какая|какую|что за)\s+(?:у тебя\s+)?модел|"
+            r"какую\s+модель\s+(?:ты\s+)?использу|"
+            r"на какой\s+модели",
             clean_text.casefold(),
         )
         if model_question:
@@ -231,7 +231,7 @@ class JarvisBrain:
         messages.append({"role": "user", "content": clean_text})
         payload = {
             "model": model, "messages": messages, "stream": False, "think": _needs_deep_reasoning(clean_text), "keep_alive": "2h",
-            "options": {"temperature": 0.35, "num_predict": 1200, "num_ctx": 4096,
+            "options": {"temperature": 0.3, "num_predict": 1000, "num_ctx": 8192,
                         "repeat_penalty": 1.08},
         }
         request = urllib.request.Request(
@@ -240,7 +240,7 @@ class JarvisBrain:
             headers={"Content-Type": "application/json"}, method="POST",
         )
         try:
-            with urllib.request.urlopen(request, timeout=90) as response:
+            with urllib.request.urlopen(request, timeout=120) as response:
                 data = json.loads(response.read().decode("utf-8"))
         except urllib.error.URLError as exc:
             reason = getattr(exc, "reason", exc)

@@ -1,4 +1,4 @@
-"""Облачное распознавание OpenAI с локальным Whisper как резервом."""
+"""Полностью локальное распознавание русской речи через faster-whisper."""
 from __future__ import annotations
 
 import numpy as np

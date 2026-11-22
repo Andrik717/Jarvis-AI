@@ -93,6 +93,18 @@ try {
         throw 'Downloaded pc_control.py is missing safe typo matching for known commands.'
     }
 
+    if (-not (Select-String -LiteralPath $stagedPcControl -Pattern 'открою' -Quiet)) {
+        throw 'Downloaded pc_control.py is missing natural Russian command forms.'
+    }
+
+    if (-not (Select-String -LiteralPath $stagedPcControl -Pattern 'taskkill.exe' -Quiet)) {
+        throw 'Downloaded pc_control.py is missing allowlisted application closing.'
+    }
+
+    if (-not (Select-String -LiteralPath $stagedApp -Pattern 'handle_command\(question, previous_user_text=previous_user_text\)' -Quiet)) {
+        throw 'Downloaded app.py is not passing recent dialogue context to command routing.'
+    }
+
     Write-Host 'Checking downloaded Python files...'
     $compileArgs = @('-3.12', '-m', 'py_compile') + $stagedFiles
     & py @compileArgs

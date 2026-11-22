@@ -504,12 +504,20 @@ class JarvisWindow:
                 or previous_answer.casefold().startswith("сейчас в ")
             )
             city_followup = re.match(
-                r"^(?:а\s+)?(?:как\s+)?(?:в|для)\s+(.+?)[?.!]*$",
+                r"^(?:а\\s+)?(?:как\\s+)?(?:в|для)\\s+(.+?)[?.!]*$",
                 question.strip(),
                 re.IGNORECASE,
             )
-            if weather_context and city_followup:
-                city = city_followup.group(1).strip()
+            # Если Джарвис попросил назвать город, пользователь часто
+            # отвечает одним словом. Раньше такая реплика уходила в LLM.
+            asked_for_city = bool(re.search(
+                r"(?:в каком городе|назови город|укажи город)",
+                previous_answer,
+                re.IGNORECASE,
+            ))
+            bare_city = question.strip().strip(" .,!?:;") if asked_for_city else ""
+            if weather_context and (city_followup or bare_city):
+                city = city_followup.group(1).strip() if city_followup else bare_city
                 contextual_answer = handle_command("погода в " + city)
                 if contextual_answer is not None:
                     self.brain.record_exchange(question, contextual_answer)

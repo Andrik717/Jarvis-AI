@@ -12,7 +12,7 @@ class Settings:
     language: str = "ru"
     whisper_model: str = "base"
     compute_type: str = "int8"
-    beam_size: int = 1
+    beam_size: int = 5
     vad_filter: bool = True
     tts_backend: str = "edge"
     tts_voice: str = "ru-RU-DmitryNeural"
@@ -31,6 +31,9 @@ def load_settings() -> Settings:
             data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             data = {}
+    # Старый beam_size=1 слишком часто ошибается на русских словах и названиях.
+    if int(data.get("beam_size", 1) or 1) <= 1:
+        data["beam_size"] = 5
     # Более компактная Whisper Base заметно быстрее на обычном CPU, чем Small.
     if data.get("whisper_model") == "small":
         data["whisper_model"] = "base"

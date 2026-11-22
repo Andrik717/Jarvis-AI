@@ -3,7 +3,7 @@ import unittest
 from unittest.mock import patch
 
 from jarvis.brain import _clean, _is_model_question, _needs_deep_reasoning
-from jarvis.pc_control import _DuckDuckGoParser, _normalize, handle_command
+from jarvis.pc_control import _DuckDuckGoParser, _normalize, _is_close_alias, handle_command
 
 
 class DialogueTests(unittest.TestCase):
@@ -21,6 +21,11 @@ class DialogueTests(unittest.TestCase):
 
     def test_normalization_handles_yo_and_assistant_name(self):
         self.assertEqual(_normalize("Эй, Джарвис! Открой Ёлки"), "открой елки")
+
+    def test_obvious_single_word_typo_matches_known_app(self):
+        self.assertTrue(_is_close_alias("блакнот", ("блокнот", "notepad")))
+        self.assertFalse(_is_close_alias("браузер", ("блокнот", "notepad")))
+        self.assertFalse(_is_close_alias("открой блокнот", ("блокнот", "notepad")))
 
 
 class WebSearchParserTests(unittest.TestCase):

@@ -42,27 +42,46 @@ def _weather_for_city(city: str) -> str:
     if not city:
         return "Назови город, и я проверю погоду."
     try:
-        # В разговоре город обычно называют в предложном падеже:
-        # «в Екатеринбурге», «в Москве». Геокодеру передаём также начальную форму.
-        candidates = [city]
+        # Учитываем частые формы русских городов и типичную ошибку Whisper
+        # «Москверо» вместо «Москва». Не используем первый результат геокодера вслепую.
+        aliases = {
+            "москверо": "Москва",
+            "москве": "Москва",
+            "екатеринбурге": "Екатеринбург",
+            "питере": "Санкт-Петербург",
+            "петербурге": "Санкт-Петербург",
+            "нижнем новгороде": "Нижний Новгород",
+            "новосибирске": "Новосибирск",
+            "казани": "Казань",
+        }
+        requested_city = aliases.get(city.casefold(), city)
+        candidates = [requested_city]
         for ending in ("е", "и", "у", "ю", "ом", "ем"):
-            if city.casefold().endswith(ending) and len(city) > len(ending) + 2:
-                candidates.append(city[:-len(ending)])
+            if requested_city.casefold().endswith(ending) and len(requested_city) > len(ending) + 2:
+                candidates.append(requested_city[:-len(ending)])
                 break
 
         places = []
+        requested_key = _normalize(requested_city)
         for candidate in dict.fromkeys(candidates):
             geo_url = (
                 "https://geocoding-api.open-meteo.com/v1/search?"
-                + urllib.parse.urlencode({"name": candidate, "count": 1, "language": "ru", "format": "json"})
+                + urllib.parse.urlencode({"name": candidate, "count": 5, "language": "ru", "format": "json"})
             )
             request = urllib.request.Request(geo_url, headers={"User-Agent": "JarvisAI/1.0"})
             with urllib.request.urlopen(request, timeout=8) as response:
-                places = json.loads(response.read().decode("utf-8")).get("results") or []
+                results = json.loads(response.read().decode("utf-8")).get("results") or []
+            places = [
+                item for item in results
+                if _normalize(str(item.get("name", ""))) == requested_key
+            ]
             if places:
                 break
         if not places:
-            return f"Не нашёл город «{city}». Назови город ещё раз, пожалуйста."
+            return (
+                f"Не могу надёжно определить город «{city}». "
+                "Уточни название, чтобы я не показал погоду для другого места."
+            )
 
         place = places[0]
         params = {

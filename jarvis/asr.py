@@ -106,6 +106,10 @@ class SpeechRecognizer:
             beam_size=max(1, min(5, int(self.settings.beam_size))),
             vad_filter=self.settings.vad_filter,
             condition_on_previous_text=False,
+            initial_prompt=(
+                "Русская разговорная речь. Названия и термины: Джарвис, Ollama, "
+                "Windows, Telegram, Steam, YouTube, Екатеринбург, Москва, Whisper."
+            ),
             temperature=0.0,
         )
         return " ".join(segment.text.strip() for segment in segments).strip()

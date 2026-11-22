@@ -6,6 +6,7 @@ import os
 import re
 import tempfile
 import time
+import threading
 from pathlib import Path
 import platform
 
@@ -28,6 +29,7 @@ class SpeechOutput:
     def __init__(self, settings: Settings):
         self.settings = settings
         self._engine = None
+        self._stop_event = threading.Event()
 
     def _sapi(self):
         if platform.system() != "Windows":
@@ -67,12 +69,14 @@ class SpeechOutput:
             asyncio.run(synthesize())
             if not os.path.exists(filename) or os.path.getsize(filename) < 256:
                 raise RuntimeError("Edge TTS не создал аудио для ru-RU-DmitryNeural")
+            if self._stop_event.is_set():
+                return
 
             if not pygame.mixer.get_init():
                 pygame.mixer.init()
             pygame.mixer.music.load(filename)
             pygame.mixer.music.play()
-            while pygame.mixer.music.get_busy():
+            while pygame.mixer.music.get_busy() and not self._stop_event.is_set():
                 time.sleep(0.04)
             pygame.mixer.music.unload()
         finally:
@@ -82,6 +86,20 @@ class SpeechOutput:
             except Exception:
                 pass
             Path(filename).unlink(missing_ok=True)
+
+    def reset_stop(self) -> None:
+        """Сбрасывает флаг перед запуском новой задачи озвучки."""
+        self._stop_event.clear()
+
+    def stop(self) -> None:
+        """Останавливает текущую озвучку; безопасен и до начала воспроизведения."""
+        self._stop_event.set()
+        try:
+            import pygame
+            if pygame.mixer.get_init():
+                pygame.mixer.music.stop()
+        except Exception:
+            pass
 
     def speak(self, text: str) -> None:
         text = _speech_text(text)

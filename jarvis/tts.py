@@ -50,18 +50,18 @@ class SpeechOutput:
                 lowered = description.casefold()
                 if "russian" in lowered or "рус" in lowered or "ru-ru" in lowered:
                     russian.append((voice, lowered))
-            if not russian:
-                raise RuntimeError(
-                    "В Windows не найден установленный русский голос SAPI. "
-                    "Установите русский голос Windows в параметрах специальных возможностей/речи."
+            if russian:
+                # Если среди русских голосов есть мужской, предпочитаем его.
+                male_markers = ("male", "муж", "dmitry", "дмитрий", "pavel", "павел", "andrey", "андрей")
+                selected = next(
+                    (voice for voice, desc in russian if any(marker in desc for marker in male_markers)),
+                    russian[0][0],
                 )
-            # Если среди установленных русских голосов есть мужской, предпочитаем его.
-            male_markers = ("male", "муж", "dmitry", "дмитрий", "pavel", "павел", "andrey", "андрей")
-            selected = next(
-                (voice for voice, desc in russian if any(marker in desc for marker in male_markers)),
-                russian[0][0],
-            )
-            engine.Voice = selected
+                engine.Voice = selected
+            elif voices.Count:
+                # Не оставляем пользователя без звука, если русского SAPI-голоса нет:
+                # используем системный голос Windows как крайний резерв.
+                engine.Voice = voices.Item(0)
             self._engine = engine
         return self._engine
 

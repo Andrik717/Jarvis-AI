@@ -504,7 +504,7 @@ class JarvisWindow:
                 or previous_answer.casefold().startswith("сейчас в ")
             )
             city_followup = re.match(
-                r"^(?:а\\s+)?(?:как\\s+)?(?:в|для)\\s+(.+?)[?.!]*$",
+                r"^(?:а\s+)?(?:как\s+)?(?:в|для)\s+(.+?)[?.!]*$",
                 question.strip(),
                 re.IGNORECASE,
             )

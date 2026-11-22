@@ -282,33 +282,24 @@ def handle_command(user_text: str, previous_user_text: str = "") -> str | None:
     }
 
     # Закрытие разрешено только для приложений из белого списка.
-    explicit_close = re.match(r"^(?:закрой|закрывай|заверши|останови)\\s+(.+)$", text)
-    pronoun_close = bool(re.fullmatch(
-        r"(?:закрой|закрывай|заверши|останови)(?:\\s+(?:его|ее|это|приложение))?", text
-    ))
-    target_to_close = explicit_close.group(1).strip() if explicit_close else ""
-    if pronoun_close and not target_to_close:
-        prior = _normalize(previous_user_text)
-        prior_open = re.match(
-            r"^(?:открой(?:те)?|открою|открывай(?:те)?|запусти(?:те)?|запускай(?:те)?|включи(?:те)?|включай(?:те)?|покажи)\\s+(.+)$",
-            prior,
-        )
-        if prior_open:
-            target_to_close = prior_open.group(1).strip()
-    if target_to_close:
+    close_match = re.match(
+        r"^(?:закрой|закрывай|заверши|останови)(?:\\s+(.+))?$", text
+    )
+    if close_match:
+        target_to_close = (close_match.group(1) or "").strip()
+        if target_to_close in ("его", "ее", "это", "приложение", ""):
+            prior = _normalize(previous_user_text)
+            prior_open = re.match(
+                r"^(?:открой(?:те)?|открою|открывай(?:те)?|запусти(?:те)?|"
+                r"запускай(?:те)?|включи(?:те)?|включай(?:те)?|покажи)\\s+(.+)$",
+                prior,
+            )
+            target_to_close = prior_open.group(1).strip() if prior_open else ""
         for display, (aliases, _command, process_name) in apps.items():
-            matches = target_to_close in aliases or _is_close_alias(target_to_close, aliases)
-            if pronoun_close and not explicit_close:
-                prior = _normalize(previous_user_text)
-                prior_open = re.match(
-                    r"^(?:открой(?:те)?|открою|открывай(?:те)?|запусти(?:те)?|запускай(?:те)?|включи(?:те)?|включай(?:те)?|покажи)\\s+(.+)$",
-                    prior,
-                )
-                matches = bool(process_name and prior_open and (
-                    prior_open.group(1).strip() in aliases
-                    or _is_close_alias(prior_open.group(1).strip(), aliases)
-                ))
-            if process_name and matches:
+            if process_name and (
+                target_to_close in aliases
+                or _is_close_alias(target_to_close, aliases)
+            ):
                 if os.name != "nt":
                     return "Закрытие приложений доступно только в Windows."
                 result = subprocess.run(
@@ -321,10 +312,10 @@ def handle_command(user_text: str, previous_user_text: str = "") -> str | None:
                 if "not found" in detail.casefold() or "не найден" in detail.casefold():
                     return f"Приложение «{display}» уже закрыто."
                 return f"Не удалось закрыть «{display}». {detail[:180]}"
-        if explicit_close:
+        if target_to_close:
             return "Пока могу закрывать только поддерживаемые приложения: Блокнот, Калькулятор, Paint, Ножницы и Диспетчер задач."
-        if pronoun_close:
-            return "Не понял, какое приложение закрыть. Назови его, например: «закрой блокнот»."
+        return "Не понял, какое приложение закрыть. Назови его, например: «закрой блокнот»."
+
     app_match = re.match(r"^(?:открой(?:те)?|открою|открывай(?:те)?|запусти(?:те)?|запускай(?:те)?|включи(?:те)?|включай(?:те)?|покажи)\s+(.+)$", text)
     if app_match:
         target = app_match.group(1).strip()

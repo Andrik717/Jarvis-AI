@@ -57,6 +57,20 @@ try {
         throw 'Downloaded jarvis/tts.py does not contain SpeechOutput.reset_stop. No project files were changed.'
     }
 
+    if (-not (Select-String -LiteralPath $stagedTts -Pattern 'ru-RU-DmitryNeural' -Quiet)) {
+        throw 'Downloaded TTS file does not contain the confirmed Dmitry voice.'
+    }
+
+    $stagedBrain = Join-Path $stage 'jarvis\brain.py'
+    if (-not (Select-String -LiteralPath $stagedBrain -Pattern 'MAX_HISTORY_MESSAGES = 20' -Quiet)) {
+        throw 'Downloaded brain.py is missing the expected conversation-context update.'
+    }
+
+    $stagedApp = Join-Path $stage 'jarvis\app.py'
+    if (-not (Select-String -LiteralPath $stagedApp -Pattern 'weather_context' -Quiet)) {
+        throw 'Downloaded app.py is missing contextual follow-up handling.'
+    }
+
     Write-Host 'Checking downloaded Python files...'
     $compileArgs = @('-3.12', '-m', 'py_compile') + $stagedFiles
     & py @compileArgs

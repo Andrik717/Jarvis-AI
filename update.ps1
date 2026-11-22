@@ -136,7 +136,8 @@ try {
     }
 
     $installedTts = Join-Path $root 'jarvis\tts.py'
-    if (-not (Select-String -LiteralPath $installedTts -Pattern '^\s*def reset_stop\(' -Quiet)) {
+    $installedTtsText = Get-Content -LiteralPath $installedTts -Raw
+    if ($installedTtsText -notmatch 'def reset_stop') {
         throw 'Installed jarvis/tts.py is missing SpeechOutput.reset_stop.'
     }
 

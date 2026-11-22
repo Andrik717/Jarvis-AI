@@ -34,7 +34,7 @@ try {
 
     Write-Host 'Downloading update files...'
     foreach ($relative in $files) {
-        $localRelative = $relative.Replace('/', '\')
+        $localRelative = $relative -replace '/', [IO.Path]::DirectorySeparatorChar
         $stagedPath = Join-Path $stage $localRelative
         $stagedDirectory = Split-Path -Parent $stagedPath
         New-Item -ItemType Directory -Path $stagedDirectory -Force | Out-Null

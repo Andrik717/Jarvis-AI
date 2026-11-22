@@ -50,6 +50,21 @@ class SpeechRecognizer:
 
         field("model", "gpt-transcribe")
         field("languages[]", "ru")
+        field(
+            "prompt",
+            "Разговорная речь на русском языке. Сохраняй исходный смысл, "
+            "падежи, окончания, имена собственные и названия программ. "
+            "Не заменяй непонятные слова догадками и не добавляй слова, "
+            "которых не было в аудио. Контекст: пользователь разговаривает "
+            "с голосовым помощником Джарвисом о Windows, настройках и "
+            "компьютере."
+        )
+        for keyword in (
+            "Джарвис", "Jarvis", "Windows", "Ollama", "Whisper",
+            "Telegram", "Steam", "YouTube", "Екатеринбург", "Москва",
+            "PowerShell", "Python", "микрофон", "распознавание речи",
+        ):
+            field("keywords[]", keyword)
         parts.append(
             f"--{boundary}\r\n"
             'Content-Disposition: form-data; name="file"; filename="jarvis_voice.wav"\r\n'
@@ -107,8 +122,13 @@ class SpeechRecognizer:
             vad_filter=self.settings.vad_filter,
             condition_on_previous_text=False,
             initial_prompt=(
-                "Русская разговорная речь. Названия и термины: Джарвис, Ollama, "
-                "Windows, Telegram, Steam, YouTube, Екатеринбург, Москва, Whisper."
+                "Это естественный разговор пользователя с голосовым помощником "
+                "Джарвисом на русском языке. Сохраняй разговорную форму, окончания, "
+                "отрицания, числа и вопросительную интонацию. Не додумывай слова. "
+                "Если слово неразборчиво, не подменяй его похожим по теме. "
+                "Возможные названия и термины: Джарвис, Jarvis, Ollama, Windows, "
+                "Telegram, Steam, YouTube, Екатеринбург, Москва, Whisper, "
+                "PowerShell, Python, микрофон, распознавание речи."
             ),
             temperature=0.0,
         )

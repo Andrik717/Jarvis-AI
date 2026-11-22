@@ -549,7 +549,7 @@ class JarvisWindow:
         if self._busy:
             return
         self._speech_cancelled.clear()
-        self.tts.reset_stop()
+        self._reset_tts_stop()
         self._set_busy(True, "ПРОВЕРЯЮ НЕЙРОСЕТЕВОЙ РУССКИЙ ГОЛОС…")
         def worker():
             try:

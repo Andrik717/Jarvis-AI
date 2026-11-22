@@ -515,7 +515,10 @@ class JarvisWindow:
                     self.brain.record_exchange(question, contextual_answer)
                     return contextual_answer
 
-        answer = handle_command(question)
+        previous_user_text = ""
+        if len(history) >= 2:
+            previous_user_text = history[-2].get("content", "")
+        answer = handle_command(question, previous_user_text=previous_user_text)
         if answer is not None:
             self.brain.record_exchange(question, answer)
             return answer
